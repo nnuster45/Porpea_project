@@ -88,4 +88,36 @@ def discover(cfg, client, log=print):
         rows.append(row)
     columns = ["place_id", "name", "lat", "lng", "address", "primary_type", "types",
                "business_status", "maps_url", "keywords"]
-    return pd.DataFrame(rows, columns=columns).sort_values("name").reset_index(drop=True)
+    df = pd.DataFrame(rows, columns=columns)
+    return suggest_keep(df, disc).sort_values(["keep", "name"], ascending=[False, True]).reset_index(drop=True)
+
+
+def suggest_keep(df, disc):
+    """Add keep (1/0) and note columns: 0 = looks like a shop/office rather than a market."""
+    bad_type = disc.get("suspect_primary_type")
+    bad_name = disc.get("suspect_name")
+    notes = pd.Series("", index=df.index)
+    if bad_type:
+        hit = df["primary_type"].fillna("").str.contains(bad_type, case=False, regex=True)
+        notes[hit] = "primary_type=" + df.loc[hit, "primary_type"]
+    if bad_name:
+        hit = df["name"].fillna("").str.contains(bad_name, case=False, regex=True) & (notes == "")
+        notes[hit] = "name looks like a shop/residence"
+    df = df.copy()
+    df["keep"] = (notes == "").astype(int)
+    df["note"] = notes
+    return df
+
+
+def carry_over_keep(new, old):
+    """Keep the user's manual keep/note edits from a previous markets.csv for places found again."""
+    if old is None or "keep" not in old.columns:
+        return new
+    prev = old.drop_duplicates("place_id").set_index("place_id")
+    known = new["place_id"].isin(prev.index)
+    new = new.copy()
+    new.loc[known, "keep"] = new.loc[known, "place_id"].map(pd.to_numeric(prev["keep"], errors="coerce")).fillna(1).astype(int).values
+    if "note" in prev.columns:
+        new.loc[known, "note"] = new.loc[known, "place_id"].map(prev["note"]).fillna("").values
+    new["is_new"] = (~known).astype(int)
+    return new

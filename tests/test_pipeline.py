@@ -276,3 +276,74 @@ def test_client_raises_api_error_message(tmp_path):
     client = GoogleClient("key", DiskCache(tmp_path), min_interval_s=0, session=session)
     with pytest.raises(GoogleAPIError, match="has not been used"):
         client.place_details("abc")
+
+
+# ---------- keep column ----------
+
+from sitefinder.discover import carry_over_keep, suggest_keep  # noqa: E402
+
+DISC = {
+    "suspect_primary_type": "restaurant|cafe|lodging|real_estate",
+    "suspect_name": "^ร้าน|คอนโด",
+}
+
+
+def _found():
+    return pd.DataFrame({
+        "place_id": ["a", "b", "c", "d", "e"],
+        "name": ["ตลาดนัดวัดใหม่", "ร้านส้มตำ ตลาดเก่า", "คอนโด ตลาดบางแสน", "ตลาดคาเฟ่", "ตลาดหนองมน"],
+        "primary_type": ["buddhist_temple", "thai_restaurant", "apartment_building", "cafe", "market"],
+    })
+
+
+def test_suggest_keep_flags_shops_but_not_temple_markets():
+    df = suggest_keep(_found(), DISC).set_index("place_id")
+    assert df["keep"].to_dict() == {"a": 1, "b": 0, "c": 0, "d": 0, "e": 1}
+    assert df.loc["b", "note"] == "primary_type=thai_restaurant"
+    assert "shop" in df.loc["c", "note"]
+
+
+def test_rerun_discover_keeps_manual_edits():
+    old = suggest_keep(_found(), DISC)
+    old.loc[old["place_id"] == "d", "keep"] = 1          # user: the café one is a real market
+    old.loc[old["place_id"] == "e", ["keep", "note"]] = [0, "ไปดูแล้ว เงียบ"]
+    new = suggest_keep(pd.concat([_found(), pd.DataFrame(
+        {"place_id": ["f"], "name": ["ตลาดใหม่"], "primary_type": ["market"]})]), DISC)
+    merged = carry_over_keep(new, old).set_index("place_id")
+    assert merged.loc["d", "keep"] == 1
+    assert merged.loc["e", "keep"] == 0 and merged.loc["e", "note"] == "ไปดูแล้ว เงียบ"
+    assert merged.loc["f", "is_new"] == 1 and merged.loc["a", "is_new"] == 0
+
+
+def test_cli_stages_only_use_keep_rows(tmp_path, monkeypatch, capsys):
+    from sitefinder import cli
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data").mkdir()
+    pd.DataFrame({"place_id": ["a", "b", "c"], "keep": [1, 0, ""]}).to_csv("data/markets.csv", index=False)
+    assert cli.load_markets()["place_id"].tolist() == ["a", "c"]  # blank keep counts as keep
+
+    cfg = {"area": CFG["area"], "discover": {"keywords": ["x"]},
+           "surroundings": {"source": "google_aggregate", "radii_m": [500, 1500],
+                            "google_types": {f"f{i}": ["t"] for i in range(6)}}}
+    cli.cmd_estimate(cfg, type("A", (), {"markets": 400})())
+    out = capsys.readouterr().out
+    assert "markets: 2" in out and "24 calls" in out
+
+
+def test_osm_extra_not_double_counted_when_source_is_osm(markets):
+    from sitefinder.surround import surround
+
+    class FakeOverpass:
+        def __init__(self):
+            self.features = []
+
+        def count(self, lat, lng, r, filters):
+            self.features.append(tuple(filters))
+            return {k: 1 for k in filters}
+
+    ov = FakeOverpass()
+    cfg = {"surroundings": {"source": "osm", "radii_m": [500],
+                            "osm_filters": {"school": ["s"], "conv_store": ["c"]},
+                            "osm_extra": {"school": ["s"], "industrial": ["i"]}}}
+    df = surround(cfg, markets, overpass=ov, log=lambda *_: None)
+    assert sorted(c for c in df.columns if c != "place_id") == ["conv_store_500", "industrial_500", "school_500"]

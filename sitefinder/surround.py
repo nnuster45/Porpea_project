@@ -103,9 +103,12 @@ def surround(cfg, markets, google_client=None, overpass=None, log=print):
     else:
         raise ValueError(f"unknown surroundings.source: {sc['source']}")
 
-    if sc.get("osm_extra"):
-        log("  OSM extra features (industrial)…")
-        frames.append(osm_counts(markets, overpass, sc["osm_extra"], radii, log))
+    extra = dict(sc.get("osm_extra") or {})
+    if sc["source"] == "osm":  # already counted above
+        extra = {k: v for k, v in extra.items() if k not in sc["osm_filters"]}
+    if extra:
+        log(f"  OSM extra features ({', '.join(extra)})…")
+        frames.append(osm_counts(markets, overpass, extra, radii, log))
 
     for ext in cfg.get("external_pois") or []:
         path = Path(ext["path"])

@@ -29,6 +29,10 @@ discover:
   # ตัดผลที่ชื่อไม่ใช่ตลาดจริง (เช่น "ตลาดหุ้น", ร้านในตลาด) — regex, ไม่สนตัวพิมพ์
   name_must_match: "ตลาด|market|walking street|ถนนคนเดิน|บาซาร์|bazaar|plaza|พลาซ่า"
   name_exclude: "ตลาดหลักทรัพย์|ประกันภัย|อสังหา|ธนาคาร"
+  # ผลที่เข้าข่ายด้านล่างจะได้ keep=0 ใน markets.csv (แค่แนะนำ — แก้เป็น 1 ได้)
+  # ไม่ใส่ temple/place_of_worship เพราะตลาดนัดในวัดมีเยอะ
+  suspect_primary_type: "restaurant|cafe|coffee|bakery|^bar$|lodging|hotel|real_estate|bank|atm|insurance|^car_|corporate_office|school|university|hospital|doctor|clinic|dentist|beauty|hair|spa|gym|parking|gas_station"
+  suspect_name: "^ร้าน|^บริษัท|^หจก|คอนโด|condo|หมู่บ้าน|อพาร์ท|apartment"
 
 surroundings:
   # source: google_aggregate (Places Aggregate API) หรือ osm (Overpass, ฟรี)
@@ -36,16 +40,15 @@ surroundings:
   radii_m: [500, 1500]
   # ชื่อ feature -> place types ของ Google (นับรวมกัน)
   # https://developers.google.com/maps/documentation/places/web-service/place-types
+  # call ต่อการรัน = จำนวนตลาด (keep=1) × จำนวน feature × จำนวนรัศมี — ฟรี 5,000 call/เดือน
+  # เลยเก็บไว้ 6 ตัวที่ Google แม่นกว่า OSM ส่วน school/hospital/transit ย้ายไปดึงจาก OSM (ฟรี) ด้านล่าง
   google_types:
     conv_store: [convenience_store]
     supermarket: [supermarket, grocery_store]
     mall: [shopping_mall, department_store]
     university: [university]
-    school: [school, primary_school, secondary_school]
-    hospital: [hospital]
     lodging: [lodging]
     apartment: [apartment_building, apartment_complex]
-    transit: [bus_station, transit_station]
   # ชื่อ feature -> Overpass filter (ใช้เมื่อ source: osm หรือ features เสริมด้านล่าง)
   osm_filters:
     conv_store: ['nwr["shop"="convenience"]']
@@ -57,9 +60,13 @@ surroundings:
     lodging: ['nwr["tourism"="hotel"]', 'nwr["tourism"="guest_house"]']
     apartment: ['nwr["building"="dormitory"]', 'nwr["building"="apartments"]']
     transit: ['nwr["highway"="bus_stop"]']
-  # feature จาก OSM ที่ดึงเพิ่มเสมอ (Google จัดประเภทโรงงานได้ไม่ดี) — ตั้ง [] ถ้าไม่ต้องการ
+  # feature จาก OSM ที่ดึงเพิ่มเสมอ (ฟรี) — โรงงาน (Google จัดประเภทได้ไม่ดี) และตัวที่ตัดออกจาก google_types
+  # ตั้ง {} ถ้าไม่ต้องการ
   osm_extra:
     industrial: ['way["landuse"="industrial"]', 'nwr["man_made"="works"]']
+    school: ['nwr["amenity"="school"]']
+    hospital: ['nwr["amenity"="hospital"]']
+    transit: ['nwr["highway"="bus_stop"]']
 
 # ไฟล์ POI ภายนอก เช่น สาขา 7-11 จาก official — CSV ต้องมีคอลัมน์ lat, lng
 # (คอลัมน์ category ถ้ามี จะแยกนับตามค่านั้นด้วย เช่น ปั๊ม/โรงพยาบาล/ชุมชน)

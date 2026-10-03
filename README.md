@@ -30,7 +30,8 @@ python -m sitefinder estimate # ดูจำนวน call ก่อนใช้
 | คำสั่ง | ทำอะไร | ผลลัพธ์ |
 |---|---|---|
 | `python -m sitefinder discover` | ค้นหาตลาดด้วยคำค้นใน `config.yaml` ทั่ว grid ของจังหวัด, ตัดผลนอกจังหวัด/ไม่ใช่ตลาด/ปิดถาวร | `data/markets.csv` |
-| *(แนะนำ)* เปิด `data/markets.csv` | ลบแถวที่ไม่ใช่ตลาดจริงทิ้ง ก่อนจ่าย quota ขั้นถัดไป | |
+| **คัดกรอง** `data/markets.csv` | ตั้ง `keep=0` ให้แถวที่ไม่ใช่ตลาดจริง (ระบบเดาให้แล้วบางส่วน ดูเหตุผลในคอลัมน์ `note`) — ขั้นต่อจากนี้ใช้เฉพาะ `keep=1` | |
+| `python -m sitefinder estimate` | เช็กว่าจำนวนตลาดที่เหลืออยู่ใน free cap ไหม | |
 | `python -m sitefinder enrich` | ดึงเรตติ้ง, จำนวนรีวิว, เวลาเปิด → แปลงเป็น `open_morning/evening/night`, `days_open` | `data/market_details.csv` |
 | `python -m sitefinder surround` | นับ POI รอบตลาดตามรัศมีใน config + โรงงานจาก OSM + ไฟล์ภายนอก (7-11) | `data/surroundings.csv` |
 | `python -m sitefinder score --persona factory_worker` | จัดอันดับตาม persona | `data/ranked.csv` |
@@ -38,8 +39,9 @@ python -m sitefinder estimate # ดูจำนวน call ก่อนใช้
 | `python -m sitefinder all` | รันทั้งหมดต่อกัน | |
 
 - ทุก response จาก API ถูก cache ใน `data/cache/` — รันซ้ำไม่เสีย quota ซ้ำ
-- `--max-calls N` (default 4000) หยุดเมื่อ call ที่เสียเงินครบ N ครั้ง; รันใหม่จะทำต่อจากที่ค้างเพราะของเดิมอยู่ใน cache
-- **ระวัง:** `discover` รันใหม่จะเขียนทับ `data/markets.csv` (รวมแถวที่คุณลบทิ้งไปแล้ว)
+- `--max-calls N` (default 4900) หยุดเมื่อ call ที่ไม่ได้มาจาก cache ครบ N ครั้งในการรันนั้น; รันใหม่จะทำต่อจากที่ค้างเพราะของเดิมอยู่ใน cache
+- รัน `discover` ซ้ำได้ — ค่า `keep`/`note` ที่คุณแก้ไว้จะถูกเก็บไว้ ตลาดที่เจอใหม่จะมี `is_new=1`
+- **อย่าลบแถว** ให้ตั้ง `keep=0` แทน (ถ้าลบ แล้วรัน discover ซ้ำ แถวนั้นจะกลับมา)
 
 ## ข้อมูลสาขา 7-11 (หรือ POI อื่น) จากแหล่งภายนอก
 
@@ -60,8 +62,17 @@ Persona ตั้งต้น: `general`, `factory_worker`, `student`, `office`,
 
 ## ข้อควรรู้
 
-- **SKU / ค่าใช้จ่าย:** discover ใช้ field ระดับ Pro (ฟรี 5,000/เดือน), enrich ใช้ระดับ Enterprise (ฟรี 1,000/เดือน) — ดึงเฉพาะตลาดที่ผ่านการกรองแล้วเท่านั้น
-- Places Aggregate API เป็นบริการค่อนข้างใหม่ ตรวจราคา/ประเทศที่รองรับใน Console ก่อนรันเต็ม — ลอง `--max-calls 20` ก่อนได้
+- **Free cap แยกต่อ SKU ต่อเดือน (ต่อ billing account):**
+
+  | ขั้น | SKU | ฟรี/เดือน | ใช้ |
+  |---|---|---|---|
+  | discover | Text Search Pro | 5,000 | tiles × keywords × ≤3 หน้า |
+  | enrich | Place Details Enterprise | 1,000 | 1 ต่อตลาด (keep=1) |
+  | surround | Places Aggregate (Pro) | 5,000 | ตลาด × `google_types` (6) × รัศมี (2) → ฟรีถึง ~416 ตลาด |
+
+  ส่วนเกินของ Aggregate คิด $10/1,000 call — ลด `google_types` หรือ `radii_m` ได้ถ้าตลาดเยอะ
+  (school/hospital/transit/industrial ดึงจาก OSM ฟรี ไม่กิน quota Google)
+- ลองรัน `--max-calls 20` ก่อนรันเต็ม เพื่อเช็กว่า key/API เปิดถูกต้อง
 - Google ไม่มีข้อมูล Popular Times ใน API — จำนวนรีวิวคือ proxy ที่ใกล้ที่สุด ต้องยืนยันด้วยการลงพื้นที่
 - ข้อมูลจาก Google ใช้วิเคราะห์ภายใน ไม่ควรเผยแพร่ต่อ (เงื่อนไขของ Google Maps Platform) — `data/` ถูก gitignore ไว้แล้ว
 
