@@ -1,0 +1,126 @@
+# ตั้งค่า pipeline หาทำเลตลาด
+# API key ไม่ได้อยู่ในไฟล์นี้ — ใส่ใน .env (ดู .env.example)
+
+area:
+  name: ชลบุรี
+  # คำที่ต้องมีใน formattedAddress ถึงจะนับว่าอยู่ในพื้นที่ (กันผลล้นไปจังหวัดอื่น)
+  address_must_contain: ["ชลบุรี", "Chon Buri", "Chonburi"]
+  # กรอบสี่เหลี่ยมครอบจังหวัด (lat ใต้→เหนือ, lng ตะวันตก→ตะวันออก)
+  bbox:
+    south: 12.55
+    north: 13.62
+    west: 100.78
+    east: 101.62
+  # ขนาดช่อง grid ตั้งต้น (องศา, 0.1 ≈ 11 กม.) ถ้าช่องไหนผลเต็ม 60 จะซอยย่อยอัตโนมัติ
+  tile_deg: 0.1
+  max_subdivide_depth: 2
+
+discover:
+  # คำค้นหาตลาด — เพิ่ม/ลดได้ ยิ่งเยอะยิ่งครอบคลุมแต่ใช้ quota มากขึ้น
+  keywords:
+    - ตลาดนัด
+    - ตลาด
+    - ตลาดโต้รุ่ง
+    - ตลาดเย็น
+    - ตลาดเช้า
+    - walking street
+    - ถนนคนเดิน
+    - night market
+  # ตัดผลที่ชื่อไม่ใช่ตลาดจริง (เช่น "ตลาดหุ้น", ร้านในตลาด) — regex, ไม่สนตัวพิมพ์
+  name_must_match: "ตลาด|market|walking street|ถนนคนเดิน|บาซาร์|bazaar|plaza|พลาซ่า"
+  name_exclude: "ตลาดหลักทรัพย์|ประกันภัย|อสังหา|ธนาคาร"
+
+surroundings:
+  # source: google_aggregate (Places Aggregate API) หรือ osm (Overpass, ฟรี)
+  source: google_aggregate
+  radii_m: [500, 1500]
+  # ชื่อ feature -> place types ของ Google (นับรวมกัน)
+  # https://developers.google.com/maps/documentation/places/web-service/place-types
+  google_types:
+    conv_store: [convenience_store]
+    supermarket: [supermarket, grocery_store]
+    mall: [shopping_mall, department_store]
+    university: [university]
+    school: [school, primary_school, secondary_school]
+    hospital: [hospital]
+    lodging: [lodging]
+    apartment: [apartment_building, apartment_complex]
+    transit: [bus_station, transit_station]
+  # ชื่อ feature -> Overpass filter (ใช้เมื่อ source: osm หรือ features เสริมด้านล่าง)
+  osm_filters:
+    conv_store: ['nwr["shop"="convenience"]']
+    supermarket: ['nwr["shop"="supermarket"]']
+    mall: ['nwr["shop"="mall"]', 'nwr["shop"="department_store"]']
+    university: ['nwr["amenity"="university"]', 'nwr["amenity"="college"]']
+    school: ['nwr["amenity"="school"]']
+    hospital: ['nwr["amenity"="hospital"]']
+    lodging: ['nwr["tourism"="hotel"]', 'nwr["tourism"="guest_house"]']
+    apartment: ['nwr["building"="dormitory"]', 'nwr["building"="apartments"]']
+    transit: ['nwr["highway"="bus_stop"]']
+  # feature จาก OSM ที่ดึงเพิ่มเสมอ (Google จัดประเภทโรงงานได้ไม่ดี) — ตั้ง [] ถ้าไม่ต้องการ
+  osm_extra:
+    industrial: ['way["landuse"="industrial"]', 'nwr["man_made"="works"]']
+
+# ไฟล์ POI ภายนอก เช่น สาขา 7-11 จาก official — CSV ต้องมีคอลัมน์ lat, lng
+# (คอลัมน์ category ถ้ามี จะแยกนับตามค่านั้นด้วย เช่น ปั๊ม/โรงพยาบาล/ชุมชน)
+external_pois:
+  - name: seven
+    path: data/external/7eleven.csv
+    radii_m: [500, 1500]
+
+scoring:
+  # เลือก persona ที่ตรงกับลูกค้าของคุณ (ดูน้ำหนักด้านล่าง) หรือสร้างใหม่ได้
+  persona: general
+  # ความเชื่อมั่นของ rating: ตลาดรีวิวน้อยจะถูกดึงเข้าหาค่าเฉลี่ย
+  rating_prior_reviews: 30
+  personas:
+    general:
+      reviews: 3
+      rating: 1
+      conv_store_500: 2
+      conv_store_1500: 1
+      seven_500: 1
+      supermarket_1500: 1
+      mall_1500: 1
+      apartment_1500: 1
+      transit_500: 1
+      open_evening: 1
+      days_open: 1
+    factory_worker:
+      reviews: 2
+      rating: 1
+      conv_store_1500: 2
+      seven_1500: 1
+      apartment_1500: 3
+      industrial_1500: 3
+      open_evening: 3
+      open_night: 1
+      days_open: 1
+    student:
+      reviews: 2
+      rating: 1
+      university_1500: 4
+      apartment_1500: 3
+      conv_store_500: 2
+      open_evening: 2
+      open_night: 2
+    office:
+      reviews: 2
+      rating: 1
+      conv_store_500: 2
+      hospital_1500: 2
+      mall_1500: 1
+      transit_500: 2
+      open_morning: 2
+      open_evening: 2
+      days_open: 2
+    tourist:
+      reviews: 4
+      rating: 2
+      lodging_1500: 4
+      mall_1500: 1
+      open_night: 3
+      open_evening: 1
+
+output:
+  top_n_map: 50

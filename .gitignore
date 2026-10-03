@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+# ผลลัพธ์และ cache ของ API (มีข้อมูลจาก Google — ไม่ควรขึ้น repo)
+data/*
+!data/external/
+data/external/*
+!data/external/*.example.csv
