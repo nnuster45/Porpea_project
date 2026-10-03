@@ -183,8 +183,8 @@ def test_google_counts_skips_rejected_feature(markets):
     fake = FakeGoogle({})
     orig = fake.count_places
     fake.count_places = lambda *a: calls.append(a) or orig(*a)
-    df = google_counts(markets, fake, {"conv_store": ["convenience_store"], "bad": ["bad_type"]},
-                       [500, 1500], log=lambda *_: None)
+    specs = {"conv_store": (["convenience_store"], [500, 1500]), "bad": (["bad_type"], [500, 1500])}
+    df = google_counts(markets, fake, specs, log=lambda *_: None)
     assert df["conv_store_500"].tolist() == [6] * 5
     assert df["bad_500"].isna().all() and df["bad_1500"].isna().all()
     assert sum(1 for c in calls if "bad_type" in c[3]) == 1  # gave up after the first 400
@@ -194,7 +194,7 @@ def test_google_counts_aborts_on_auth_error(markets):
     fake = FakeGoogle({})
     fake.count_places = lambda *a: (_ for _ in ()).throw(GoogleAPIError(403, "API not enabled"))
     with pytest.raises(GoogleAPIError):
-        google_counts(markets, fake, {"conv_store": ["convenience_store"]}, [500], log=lambda *_: None)
+        google_counts(markets, fake, {"conv_store": (["convenience_store"], [500])}, log=lambda *_: None)
 
 
 def test_external_counts_by_radius_and_category(markets):
@@ -220,7 +220,7 @@ def test_overpass_query_and_parse():
 def test_end_to_end_score_and_map(markets, tmp_path):
     fake = FakeGoogle({})
     details = enrich(markets, fake, log=lambda *_: None)
-    surround_df = google_counts(markets, fake, {"conv_store": ["convenience_store"]}, [500], log=lambda *_: None)
+    surround_df = google_counts(markets, fake, {"conv_store": (["convenience_store"], [500])}, log=lambda *_: None)
     surround_df["conv_store_500"] = [1, 2, 3, 4, 5]
     df = build_features(markets, details, surround_df)
     ranked = score(df, {"reviews": 2, "conv_store_500": 1, "open_evening": 1, "missing_col": 5},
@@ -347,3 +347,78 @@ def test_osm_extra_not_double_counted_when_source_is_osm(markets):
                             "osm_extra": {"school": ["s"], "industrial": ["i"]}}}
     df = surround(cfg, markets, overpass=ov, log=lambda *_: None)
     assert sorted(c for c in df.columns if c != "place_id") == ["conv_store_500", "industrial_500", "school_500"]
+
+
+# ---------- workplaces / factories ----------
+
+from sitefinder.osm import _to_local_m, clipped_area_ha, polygons_from_overpass  # noqa: E402
+from sitefinder.surround import google_call_count, google_specs, load_pois  # noqa: E402
+
+
+def test_google_specs_per_feature_radii():
+    sc = {"radii_m": [500, 1500], "google_types": {
+        "conv_store": ["convenience_store"],
+        "workplace": {"types": ["corporate_office", "city_hall"], "radii_m": [500]},
+    }}
+    specs = google_specs(sc)
+    assert specs["conv_store"] == (["convenience_store"], [500, 1500])
+    assert specs["workplace"] == (["corporate_office", "city_hall"], [500])
+    assert google_call_count(sc, 400) == 400 * 3
+
+
+def test_shipped_config_stays_within_aggregate_free_cap():
+    import yaml
+    with open("config.yaml", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    assert google_call_count(cfg["surroundings"], 400) <= 5000
+
+
+def _square(lat0, lng0, half_m, as_relation=False):
+    """Overpass `out geom` element for a square of side 2*half_m centred on (lat0, lng0)."""
+    dlat = half_m / 111_320
+    dlng = half_m / (111_320 * np.cos(np.radians(lat0)))
+    corners = [(lat0 - dlat, lng0 - dlng), (lat0 - dlat, lng0 + dlng),
+               (lat0 + dlat, lng0 + dlng), (lat0 + dlat, lng0 - dlng)]
+    pts = [{"lat": a, "lon": b} for a, b in corners + corners[:1]]
+    if not as_relation:
+        return {"type": "way", "geometry": pts}
+    # outer ring split into two unclosed ways, as large estates are often mapped
+    return {"type": "relation", "members": [
+        {"type": "way", "role": "outer", "geometry": pts[:3]},
+        {"type": "way", "role": "outer", "geometry": pts[2:]},
+    ]}
+
+
+def test_industrial_area_way_and_split_relation():
+    proj = _to_local_m(13.0, 101.0)
+    for as_rel in (False, True):
+        polys = polygons_from_overpass({"elements": [_square(13.0, 101.0, 100, as_rel)]}, proj)
+        assert clipped_area_ha(polys, [1000])[1000] == pytest.approx(4.0, rel=0.01)  # 200 m × 200 m
+
+
+def test_industrial_area_clipped_to_circle_and_not_double_counted():
+    proj = _to_local_m(13.0, 101.0)
+    big = _square(13.0, 101.0, 1000)              # 2 km × 2 km = 400 ha
+    dup = _square(13.0, 101.0, 1000, as_relation=True)
+    polys = polygons_from_overpass({"elements": [big, dup]}, proj)
+    areas = clipped_area_ha(polys, [500, 5000])
+    assert areas[500] == pytest.approx(np.pi * 500 ** 2 / 10_000, rel=0.01)  # circle fully inside
+    assert areas[5000] == pytest.approx(400, rel=0.01)                       # whole square, once
+    assert clipped_area_ha([], [500]) == {500: 0.0}
+
+
+def test_estate_workers_summed_by_weight(markets, tmp_path):
+    path = tmp_path / "estates.csv"
+    pd.DataFrame({
+        "name": ["A", "B", "C", "D"],
+        "lat": [13.01, 13.02, 13.30, None],
+        "lng": [101.0, 101.0, 101.0, 101.0],
+        "workers": [50000, "", 9000, 1000],
+    }).to_csv(path, index=False)
+    logs = []
+    pois = load_pois(path, "workers", logs.append)
+    assert len(pois) == 3 and any("['B']" in m for m in logs)   # missing workers → 0, warned
+    df = external_counts(markets, "estate_workers", pois, [3000], "workers").set_index("place_id")
+    assert df.loc["p_1", "estate_workers_3000"] == 50000
+    assert df.loc["p_3", "estate_workers_3000"] == 50000  # 2.2 km away
+    assert df.loc["p_5", "estate_workers_3000"] == 0      # 4.4 km away

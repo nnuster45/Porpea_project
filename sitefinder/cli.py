@@ -81,21 +81,23 @@ def cmd_estimate(cfg, args):
     n_tiles = len(plan_tiles(cfg))
     n_kw = len(cfg["discover"]["keywords"])
     sc = cfg["surroundings"]
-    n_feat = len(sc["google_types"]) if sc["source"] == "google_aggregate" else 0
+    from .surround import google_call_count
+
+    per_market = google_call_count(sc, 1) if sc["source"] == "google_aggregate" else 0
     n_markets, source = args.markets, f"assumed (--markets {args.markets})"
     if MARKETS.exists():
         all_markets = pd.read_csv(MARKETS)
         n_markets = len(load_markets())
         source = f"keep=1 in {MARKETS} ({len(all_markets) - n_markets} of {len(all_markets)} set to keep=0)"
-    n_agg = n_markets * n_feat * len(sc["radii_m"])
+    n_agg = n_markets * per_market
     print(f"grid: {n_tiles} tiles × {n_kw} keywords; markets: {n_markets} — {source}")
     print(_budget_line("discover (Text Search)", n_tiles * n_kw, n_tiles * n_kw * 3, FREE_CAPS["text_search_pro"]))
     print(_budget_line("enrich (Details)", n_markets, n_markets, FREE_CAPS["place_details_enterprise"]))
-    if n_feat:
+    if per_market:
         print(_budget_line("surround (Aggregate)", n_agg, n_agg, FREE_CAPS["places_aggregate"]))
         over = max(0, n_agg - FREE_CAPS["places_aggregate"])
         if over:
-            max_markets = FREE_CAPS["places_aggregate"] // (n_feat * len(sc["radii_m"]))
+            max_markets = FREE_CAPS["places_aggregate"] // per_market
             print(f"    → ≈ ${over / 1000 * AGGREGATE_USD_PER_1K:.0f} at ${AGGREGATE_USD_PER_1K:.0f}/1,000;"
                   f" stays free with ≤ {max_markets} markets at keep=1 or fewer google_types/radii")
     print("  caps are per billing account per month; calls already in data/cache are free on re-runs")
