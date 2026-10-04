@@ -39,22 +39,30 @@ def load_config(path):
         return yaml.safe_load(f)
 
 
-def google_client(args):
+def ledger(cfg):
+    from .budget import Ledger
+
+    b = cfg.get("budget") or {}
+    return Ledger(CACHE / "usage.json", b.get("monthly_caps"), b.get("already_used"))
+
+
+def google_client(args, cfg=None):
     from .google import GoogleClient
 
     key = os.environ.get("GOOGLE_MAPS_API_KEY")
     if not key:
         sys.exit("GOOGLE_MAPS_API_KEY is not set — copy .env.example to .env and put your key there")
-    return GoogleClient(key, DiskCache(CACHE), max_calls=args.max_calls)
+    return GoogleClient(key, DiskCache(CACHE), max_calls=args.max_calls,
+                        ledger=ledger(cfg) if cfg is not None else None)
 
 
 def osm_features(cfg):
-    """(point features, area features) the config needs from OSM."""
+    """(point features, area features, campus features) the config needs from OSM."""
     sc = cfg["surroundings"]
     points = dict(sc.get("osm_extra") or {})
     if sc["source"] == "osm":
         points = {**sc["osm_filters"], **points}
-    return points, dict(sc.get("osm_area") or {})
+    return points, dict(sc.get("osm_area") or {}), dict(sc.get("osm_campus") or {})
 
 
 def overpass_client(cfg=None):
@@ -65,8 +73,8 @@ def overpass_client(cfg=None):
         from .osm_local import LocalOSM, load
 
         local = LocalOSM(load(OSM_LOCAL))
-        points, areas = osm_features(cfg)
-        if local.has(list(points) + list(areas)):
+        points, areas, campus = osm_features(cfg)
+        if local.has(list(points) + list(areas) + list(campus)):
             print(f"  OSM: using local extract {OSM_LOCAL}")
             return local
         print(f"  OSM: {OSM_LOCAL} lacks some features — re-run `osm-extract`; falling back to Overpass")
@@ -78,8 +86,8 @@ def cmd_osm_extract(cfg, args):
 
     if not args.pbf or not Path(args.pbf).exists():
         sys.exit("give --pbf path/to/region-latest.osm.pbf (e.g. https://download.geofabrik.de/asia/thailand-latest.osm.pbf)")
-    points, areas = osm_features(cfg)
-    data = extract(args.pbf, cfg["area"]["bbox"], points, areas)
+    points, areas, campus = osm_features(cfg)
+    data = extract(args.pbf, cfg["area"]["bbox"], points, areas, campus)
     save(data, OSM_LOCAL)
     print(f"→ {OSM_LOCAL}")
 
@@ -87,7 +95,7 @@ def cmd_osm_extract(cfg, args):
 def need(path, stage):
     if not path.exists():
         sys.exit(f"{path} not found — run `python -m sitefinder {stage}` first")
-    return pd.read_csv(path)
+    return pd.read_csv(path, dtype={"open_days": str})  # "0000011" must stay text, not 11
 
 
 def load_markets():
@@ -136,12 +144,14 @@ def cmd_estimate(cfg, args):
             print(f"    → ≈ ${over / 1000 * AGGREGATE_USD_PER_1K:.0f} at ${AGGREGATE_USD_PER_1K:.0f}/1,000;"
                   f" stays free with ≤ {max_markets} markets at keep=1 or fewer google_types/radii")
     print("  caps are per billing account per month; calls already in data/cache are free on re-runs")
+    print(ledger(cfg).report())
+    print("  runs stop at budget.monthly_caps (config.yaml); whatever is left stays 'unknown' until next month")
 
 
 def cmd_discover(cfg, args):
     from .discover import discover
 
-    client = google_client(args)
+    client = google_client(args, cfg)
     try:
         df = discover(cfg, client)
     finally:
@@ -201,7 +211,7 @@ def cmd_enrich(cfg, args):
     from .enrich import enrich
 
     markets = load_markets()
-    client = google_client(args)
+    client = google_client(args, cfg)
     try:
         df = enrich(markets, client)
     finally:
@@ -214,7 +224,7 @@ def cmd_surround(cfg, args):
     from .surround import surround
 
     markets = load_markets()
-    gc = google_client(args) if cfg["surroundings"]["source"] == "google_aggregate" else None
+    gc = google_client(args, cfg) if cfg["surroundings"]["source"] == "google_aggregate" else None
     try:
         df = surround(cfg, markets, google_client=gc, overpass=overpass_client(cfg))
     finally:
@@ -224,20 +234,32 @@ def cmd_surround(cfg, args):
     print(f"→ {SURROUND} ({len(df.columns) - 1} features)")
 
 
-def cmd_score(cfg, args):
-    from .score import build_features, score
+def features(cfg):
+    """Markets (keep=1) + details + surroundings, de-duplicated, with derived measures."""
+    from .score import build_features
 
-    sc = cfg["scoring"]
-    df = build_features(
+    return build_features(
         load_markets(),
         need(DETAILS, "enrich"),
         need(SURROUND, "surround"),
-        sc.get("rating_prior_reviews", 30),
+        cfg["scoring"].get("rating_prior_reviews", 30),
+        cfg.get("discover", {}).get("dedupe"),
     )
-    ranked = score(df, sc["pillars"], sc.get("profile_top_pct", 30))
+
+
+def rank(cfg, df, log=print):
+    from .score import score
+
+    sc = cfg["scoring"]
+    return score(df, sc["pillars"], sc.get("profile_top_pct", 30), sc.get("scales"), log=log)
+
+
+def cmd_score(cfg, args):
+    df = features(cfg)
+    ranked = rank(cfg, df)
     ranked.to_csv(RANKED, index=False, encoding="utf-8-sig")
-    cols = ["rank", "score", *[f"pillar_{k}" for k in sc["pillars"] if f"pillar_{k}" in ranked], "name", "profile"]
-    print(ranked[cols].head(20).to_string(index=False))
+    pillars = [f"pillar_{k}" for k in cfg["scoring"]["pillars"] if f"pillar_{k}" in ranked]
+    print(ranked[["rank", "tier", "score", *pillars, "name", "profile"]].head(20).to_string(index=False))
     print(f"→ {RANKED}")
 
 
@@ -251,13 +273,10 @@ def cmd_map(cfg, args):
 
 def cmd_qa(cfg, args):
     from .qa import report
-    from .score import build_features, score
 
-    sc = cfg["scoring"]
-    df = build_features(load_markets(), need(DETAILS, "enrich"), need(SURROUND, "surround"),
-                        sc.get("rating_prior_reviews", 30))
-    ranked = score(df, sc["pillars"], sc.get("profile_top_pct", 30), log=lambda *_: None)
-    text = report(df, ranked)
+    raw = load_markets()
+    df = features(cfg)
+    text = report(df, rank(cfg, df, log=lambda *_: None), raw_count=len(raw), pillars=cfg["scoring"]["pillars"])
     print(text)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
@@ -267,16 +286,24 @@ def cmd_qa(cfg, args):
 
 def cmd_dashboard(cfg, args):
     from .dashboard import build_payload, render
-    from .score import build_features
 
-    df = build_features(
-        load_markets(),
-        need(DETAILS, "enrich"),
-        need(SURROUND, "surround"),
-        cfg["scoring"].get("rating_prior_reviews", 30),
-    )
-    DASHBOARD.write_text(render(build_payload(df, cfg)), encoding="utf-8")
-    print(f"→ {DASHBOARD} ({len(df)} markets) — double-click to open; weights/filters update live")
+    df = features(cfg)
+    review = pd.read_csv(REVIEW, dtype=str, encoding="utf-8-sig") if REVIEW.exists() else None
+    excluded = excluded_markets()
+    DASHBOARD.write_text(render(build_payload(df, cfg, review=review, excluded=excluded)), encoding="utf-8")
+    print(f"→ {DASHBOARD} ({len(df)} markets, {len(excluded)} excluded listed) — double-click to open")
+
+
+def excluded_markets():
+    """Places discover set to keep=0 (after review/keep.csv), so the dashboard can show / restore them."""
+    from .discover import apply_review
+
+    if not MARKETS.exists():
+        return pd.DataFrame()
+    df = apply_review(pd.read_csv(MARKETS), REVIEW)
+    if "keep" not in df:
+        return df.iloc[0:0]
+    return df[pd.to_numeric(df["keep"], errors="coerce").fillna(1) == 0]
 
 
 def cmd_all(cfg, args):

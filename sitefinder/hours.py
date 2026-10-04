@@ -1,6 +1,10 @@
 """Turn Google `regularOpeningHours.periods` into simple time-of-day features."""
 
-HOURS_PER_WEEK = 7 * 24
+import numpy as np
+
+MIN_PER_DAY = 24 * 60
+MIN_PER_WEEK = 7 * MIN_PER_DAY
+MIN_OVERLAP = 60  # a market must be open at least this many minutes in a window to count for it
 
 # hour-of-day windows (start inclusive, end exclusive; end > 24 wraps past midnight)
 WINDOWS = {
@@ -8,45 +12,57 @@ WINDOWS = {
     "open_evening": (16, 20),
     "open_night": (20, 26),
 }
+DAY_LETTERS = "อา จ อ พ พฤ ศ ส".split()  # Google: day 0 = Sunday
 
 
-def weekly_open_slots(periods):
-    """Return a set of week-hour indices (day*24 + hour, Sunday=0) the place is open."""
-    slots = set()
+def weekly_open_minutes(periods):
+    """Boolean array of the week's minutes (Sunday 00:00 = 0) when the place is open."""
+    week = np.zeros(MIN_PER_WEEK, dtype=bool)
     for period in periods or []:
         start = period.get("open")
         if not start:
             continue
         end = period.get("close")
-        if end is None:  # open 24/7 is encoded as a single open at day 0 00:00 with no close
-            return set(range(HOURS_PER_WEEK))
-        s = start.get("day", 0) * 24 + start.get("hour", 0)
-        e = end.get("day", 0) * 24 + end.get("hour", 0) + (1 if end.get("minute", 0) else 0)
+        if end is None:  # open 24/7 is a single open at day 0 00:00 with no close
+            week[:] = True
+            return week
+        s = start.get("day", 0) * MIN_PER_DAY + start.get("hour", 0) * 60 + start.get("minute", 0)
+        e = end.get("day", 0) * MIN_PER_DAY + end.get("hour", 0) * 60 + end.get("minute", 0)
         if e <= s:
-            e += HOURS_PER_WEEK
-        for h in range(s, e):
-            slots.add(h % HOURS_PER_WEEK)
-    return slots
+            e += MIN_PER_WEEK
+        idx = np.arange(s, e) % MIN_PER_WEEK
+        week[idx] = True
+    return week
+
+
+def _open_in(week, day, lo_h, hi_h):
+    lo = day * MIN_PER_DAY + lo_h * 60
+    idx = np.arange(lo, day * MIN_PER_DAY + hi_h * 60) % MIN_PER_WEEK
+    return int(week[idx].sum())
 
 
 def hours_features(opening_hours):
-    """Features in [0, 1] = share of the week's 7 days that the place is open in each window."""
+    """Share of the 7 days the market is open ≥ MIN_OVERLAP minutes in each window, plus which days.
+
+    `open_days` is a 7-char mask, Sunday first ("0000011" = Friday and Saturday)."""
     periods = (opening_hours or {}).get("periods")
     if not periods:
-        return {"hours_known": 0, "days_open": None, **{k: None for k in WINDOWS}}
+        return {"hours_known": 0, "days_open": None, "open_days": "", **{k: None for k in WINDOWS}}
 
-    slots = weekly_open_slots(periods)
+    week = weekly_open_minutes(periods)
+    days = [_open_in(week, d, 0, 24) >= MIN_OVERLAP for d in range(7)]
     features = {
         "hours_known": 1,
-        "days_open": sum(1 for d in range(7) if any(d * 24 + h in slots for h in range(24))) / 7,
+        "days_open": sum(days) / 7,
+        "open_days": "".join("1" if x else "0" for x in days),
     }
     for name, (lo, hi) in WINDOWS.items():
-        days = 0
-        for d in range(7):
-            if any((d * 24 + h) % HOURS_PER_WEEK in slots for h in range(lo, hi)):
-                days += 1
-        features[name] = days / 7
+        features[name] = sum(_open_in(week, d, lo, hi) >= MIN_OVERLAP for d in range(7)) / 7
     return features
+
+
+def describe_days(mask):
+    return " ".join(DAY_LETTERS[i] for i, c in enumerate(mask or "") if c == "1")
 
 
 def describe_hours(opening_hours):

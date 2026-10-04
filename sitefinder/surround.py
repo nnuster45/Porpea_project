@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from .geo import haversine_m
-from .google import GoogleAPIError
+from .google import BudgetExceeded, GoogleAPIError
 
 
 def google_specs(sc):
@@ -32,16 +32,21 @@ def google_call_count(sc, n_markets):
 def google_counts(markets, client, specs, log=print):
     rows = []
     broken = set()  # features whose types the API rejected; don't keep paying for errors
+    out_of_budget = False
     for i, m in enumerate(markets.itertuples(index=False), 1):
         row = {"place_id": m.place_id}
         for feature, (types, radii) in specs.items():
             for r in radii:
                 col = f"{feature}_{r}"
-                if feature in broken:
+                if feature in broken or out_of_budget:
                     row[col] = np.nan
                     continue
                 try:
                     row[col] = client.count_places(m.lat, m.lng, r, types)
+                except BudgetExceeded as e:
+                    out_of_budget = True
+                    row[col] = np.nan
+                    log(f"  ! stopping Google counts at market {i}/{len(markets)}: {e} — the rest stay 'unknown'")
                 except GoogleAPIError as e:
                     if e.status in (401, 403) or "API key" in str(e):
                         raise  # key/billing/API-not-enabled: every call would fail the same way
@@ -120,6 +125,18 @@ def osm_areas(markets, overpass, area_filters, radii, log=print):
     return pd.DataFrame(rows)
 
 
+def osm_campus(markets, local, campus_features, radii, log=print):
+    """`<feature>_<r>`: distinct institutions (campuses) within each radius."""
+    rows = []
+    for m in markets.itertuples(index=False):
+        row = {"place_id": m.place_id}
+        for feature in campus_features:
+            for r, n in local.campus_count(m.lat, m.lng, radii, feature).items():
+                row[f"{feature}_{r}"] = n
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
 def _slug(text):
     return re.sub(r"[^0-9a-zA-Zก-๙]+", "_", str(text)).strip("_").lower() or "other"
 
@@ -188,6 +205,14 @@ def surround(cfg, markets, google_client=None, overpass=None, log=print):
     if extra:
         log(f"  OSM extra counts ({', '.join(extra)})…")
         frames.append(osm_counts(markets, overpass, extra, radii, log))
+
+    if sc.get("osm_campus"):
+        if hasattr(overpass, "campus_count"):
+            campus_radii = sc.get("campus_radii_m", radii)
+            log(f"  OSM campuses ({', '.join(sc['osm_campus'])})…")
+            frames.append(osm_campus(markets, overpass, sc["osm_campus"], campus_radii, log))
+        else:
+            log("  - osm_campus needs a local OSM extract (`osm-extract`); skipped")
 
     if sc.get("osm_area"):
         log(f"  OSM land-use area ({', '.join(sc['osm_area'])})…")

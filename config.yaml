@@ -30,16 +30,28 @@ discover:
   name_must_match: "ตลาด|market|walking street|ถนนคนเดิน|บาซาร์|bazaar|plaza|พลาซ่า"
   name_exclude: "ตลาดหลักทรัพย์|ประกันภัย|อสังหา|ธนาคาร"
   # คัดว่าอะไรคือ "ตัวตลาด" (keep=1) — ที่เหลือ keep=0 (แค่แนะนำ แก้ได้ใน review/keep.csv)
-  # จากผลจริงในชลบุรี: ร้านที่ตั้งชื่อตามตลาด ("7-11 สาขาตลาด…", "CJ สาขาตลาด…") ปนมาเยอะมาก
-  # 1) ชื่อมีคำเหล่านี้ → keep=0 (ร้านสาขา / ที่อยู่อาศัย)
-  suspect_name: "สาขา|branch|^ร้าน|^บริษัท|^หจก|คอนโด|condo|หมู่บ้าน|อพาร์ท|apartment"
-  # 2) ประเภทของ Google ที่เป็นตลาด → keep=1
-  market_types: [market, flea_market, farmers_market, food_court]
-  # 3) ประเภทอื่น แต่ชื่อขึ้นต้นแบบตลาด → keep=1 (Google จัดประเภทตลาดไทยผิดบ่อย)
+  # ตรวจตามลำดับ ข้อแรกที่เข้าเงื่อนไขชนะ:
+  # 1) ประเภทที่ไม่มีทางเป็นตลาด → keep=0 (แม้ชื่อจะเป็น "Walking Street Guest House")
+  never_market_types: [lodging, hotel, guest_house, hostel, motel, resort_hotel, bed_and_breakfast,
+                       apartment_building, apartment_complex, parking, parking_lot, parking_garage,
+                       public_bathroom, car_repair, car_dealer, real_estate_agency]
+  # 2) ชื่อขึ้นต้นแบบตลาด → keep=1 (Google จัดประเภทตลาดไทยผิดบ่อย; "ตลาดนินจา สาขา 2" ก็เป็นตลาด)
   market_name_prefix: "^(?:ตลาด|ถนนคนเดิน|walking street|night market|ไนท์มาร์เก็ต|ไนท์ บาซาร์)"
+  # 3) ชื่อแบบร้านสาขา / ที่อยู่อาศัย → keep=0 ("7-11 สาขาตลาด…", "Flash Home สาขาตลาด…")
+  suspect_name: "สาขา|branch|^ร้าน|^บริษัท|^หจก|คอนโด|condo|หมู่บ้าน|อพาร์ท|apartment"
+  # 4) "ตลาด" อยู่กลางชื่อหลังชื่อคน/สินค้า → แผงในตลาด keep=0 ("เจ๊จอม ไก่สด ตลาดสดบ่อวิน")
+  #    ยกเว้นชื่อที่มีคำเหล่านี้ (ชื่อตลาดภาษาอังกฤษ / พลาซ่า)
+  market_name_words: "market|bazaar|plaza|พลาซ่า|มาร์เก็ต|ไนท์|walking street|ถนนคนเดิน"
+  # 5) ประเภทของ Google ที่เป็นตลาด → keep=1
+  market_types: [market, flea_market, farmers_market, food_court]
+  # รวมตลาดซ้ำ (หลาย listing ของที่เดียวกัน) ตอนให้คะแนน: ห่างกัน ≤ same_site_m = ที่เดียวกัน,
+  # หรือห่าง ≤ similar_name_m และชื่อคล้ายกัน — เก็บ listing ที่รีวิวมากสุด รวมรีวิวทั้งกลุ่ม
+  dedupe:
+    same_site_m: 40
+    similar_name_m: 150
 
 surroundings:
-  # source: google_aggregate (Places Aggregate API) หรือ osm (Overpass, ฟรี)
+  # source: google_aggregate (Places Aggregate API) หรือ osm (ฟรี — ไฟล์ Geofabrik ผ่าน osm-extract, ไม่มีก็ใช้ Overpass)
   source: google_aggregate
   radii_m: [500, 1500]
   # ชื่อ feature -> place types ของ Google (นับรวมกัน)
@@ -47,19 +59,19 @@ surroundings:
   # เขียนเป็น list (ใช้ radii_m ด้านบน) หรือ {types: [...], radii_m: [...]} เพื่อกำหนดรัศมีเฉพาะตัว
   # school/hospital/transit/โรงงาน ดึงจาก OSM (ฟรี) ด้านล่างแทน
   # ดึงเฉพาะรัศมีที่ใช้ใน scoring.pillars (call ละ $0 ใน free cap แต่จำกัด 5,000/เดือน)
-  # → 7 call ต่อตลาด ≈ ฟรีถึง ~700 ตลาด
+  # → 6 call ต่อตลาด ≈ ฟรีถึง ~830 ตลาด
   google_types:
     conv_store: {types: [convenience_store], radii_m: [500]}
     supermarket: {types: [supermarket, grocery_store], radii_m: [1500]}
     mall: {types: [shopping_mall, department_store], radii_m: [1500]}
-    university: {types: [university], radii_m: [1500]}
+    # university ไม่นับจาก Google — หมุด "university" มีทุกตึก/คณะ/ร้านติว ใช้ osm_campus (นับวิทยาเขต) แทน
     apartment: {types: [apartment_building, apartment_complex], radii_m: [1500]}
     lodging: {types: [lodging], radii_m: [1500]}
     # ที่ทำงาน (ออฟฟิศ + หน่วยราชการ) — 500 ม. = ระยะเดินช่วงพักเที่ยง
     workplace:
       types: [corporate_office, city_hall, local_government_office, courthouse]
       radii_m: [500]
-  # ชื่อ feature -> Overpass filter (ใช้เมื่อ source: osm หรือ features เสริมด้านล่าง)
+  # ชื่อ feature -> OSM filter (ใช้เมื่อ source: osm หรือ features เสริมด้านล่าง)
   osm_filters:
     conv_store: ['nwr["shop"="convenience"]']
     supermarket: ['nwr["shop"="supermarket"]']
@@ -75,6 +87,11 @@ surroundings:
     school: ['nwr["amenity"="school"]']
     hospital: ['nwr["amenity"="hospital"]']
     transit: ['nwr["highway"="bus_stop"]']
+  # มหาวิทยาลัย/วิทยาลัย: นับ "สถาบัน" จากขอบเขตใน OSM (ตึก/คณะที่ติดกันรวมเป็น 1) → campus_<รัศมี>
+  # แทนการนับหมุด university ของ Google (ม.เดียวมีหลายสิบหมุด) — ต้องใช้ไฟล์ OSM (osm-extract)
+  osm_campus:
+    campus: ['nwr["amenity"="university"]', 'nwr["amenity"="college"]']
+  campus_radii_m: [1500, 3000]
   # ขนาดพื้นที่ (เฮกตาร์) ในรัศมี จาก OSM (ฟรี) → feature ชื่อ <ชื่อ>_ha_<รัศมี> เช่น industrial_ha_1500
   # วัดเป็นพื้นที่ ไม่ใช่จำนวน — โรงงานใหญ่จึงมีน้ำหนักมากกว่าโรงงานเล็ก
   osm_area:
@@ -93,47 +110,65 @@ external_pois:
     radii_m: [3000]
 
 scoring:
-  # คะแนน = ตลาดเป็นหลัก แล้วดูสิ่งรอบข้าง โดยแบ่งตัววัดเป็น 4 หมวด
-  #   1) แต่ละตัววัด → เทียบกับตลาดอื่นเป็น percentile (0–1)
-  #   2) ในหมวด: เฉลี่ยตัววัดตามน้ำหนักของมัน (measures) → คะแนนหมวด 0–100
-  #   3) รวมหมวดตาม weight ของหมวด → คะแนนรวม 0–100
-  # จัดเป็นหมวดเพื่อกันการนับเรื่องเดียวกันซ้ำ (เช่น ร้านสะดวกซื้อ 500 ม. + 1.5 กม. + 7-11)
+  # คะแนน = ตลาดเป็นหลัก แล้วดูสิ่งรอบข้าง โดยแบ่งตัววัดเป็นหมวด
+  #   1) แต่ละตัววัด → 0..1 เทียบกับตลาดอื่น (percentile; หรือ min-max ถ้าอยู่ใน scales)
+  #   2) ในหมวด: เฉลี่ยตัววัดตามน้ำหนักของมัน → คะแนนหมวด 0–100
+  #   3) รวมหมวดตาม weight ของหมวด → คะแนนรวม 0–100 → กลุ่ม A (top 10%) / B / C / D
+  # ไม่มีข้อมูล = กลาง ๆ (0.5) ไม่ได้ทั้งบวกและลบ
   # เวลาเปิดไม่อยู่ในคะแนน — ใช้เป็นตัวกรองใน dashboard แทน
   # ปรับได้ทั้งที่นี่ หรือใน dashboard แล้วกด "ส่งออกไป config"
   rating_prior_reviews: 30   # ตลาดที่รีวิวน้อยกว่าราว ๆ นี้ เรตติ้งจะถูกดึงเข้าหาค่าเฉลี่ย
-  profile_top_pct: 30        # ตลาดที่อยู่ top 30% ของหมวดไหน → ติดป้ายย่านนั้น (เช่น "ย่านที่พัก")
+  profile_top_pct: 30        # ตลาดที่อยู่ top 30% ของหมวดไหน → ติดป้ายของหมวดนั้น
+  # ตัววัดที่ใช้ค่าจริงแทนลำดับ: รีวิว (log) — 0 กับ 11 รีวิวไม่ห่างกันเกินจริง, ตลาดใหญ่มากไม่ถูกบีบ
+  scales:
+    reviews: minmax
   pillars:
     market:
       label: ตลาดนี้มีคนมาจริงไหม
+      tag: ตลาดคนเยอะ
       weight: 2              # หลักฐานตรงที่สุด จึงหนักกว่าหมวดอื่น
       measures:
-        reviews: 2
-        rating: 1
+        reviews: 1
+        rating: 0            # เรตติ้งไม่ได้บอกจำนวนคน (ค่าลบกับจำนวนรีวิว) — ดูประกอบได้ ไม่นับคะแนน
     activity:
-      label: ย่านนี้คึกคักไหม
+      label: หน้าตลาดคึกคักไหม
       tag: ย่านคึกคัก
       weight: 1
       measures:
-        conv_store_500: 2    # ถ้ามีไฟล์ 7-11 จะใช้ seven_500 แทนตัวนี้ก็ได้ (อย่าใส่ทั้งคู่ — นับซ้ำ)
-        supermarket_1500: 1
+        conv_store_500: 2    # ร้านสะดวกซื้อในระยะเดิน — ถ้ามีไฟล์ 7-11 ใช้ seven_500 แทนได้ (อย่าใส่ทั้งคู่)
         mall_1500: 1
-        transit_500: 1
     residents:
-      label: คนพักอาศัยแถวนี้เยอะไหม
+      label: คนอยู่อาศัย / นักศึกษาแถวนี้เยอะไหม
       tag: ย่านที่พัก
       weight: 1
       measures:
         apartment_1500: 2
-        lodging_1500: 1
-        university_1500: 1
+        campus_3000: 1       # จำนวนมหาวิทยาลัย/วิทยาลัย (นับวิทยาเขต ไม่ใช่ตึก) จาก OSM
     workers:
-      label: คนทำงานแถวนี้เยอะไหม
-      tag: ย่านที่ทำงาน
+      label: คนทำงานโรงงาน / ออฟฟิศแถวนี้เยอะไหม
+      tag: ย่านโรงงาน/ที่ทำงาน
       weight: 1
       measures:
+        industrial_ha_1500: 2
+        estate_workers_3000: 2
         workplace_500: 1
-        industrial_ha_1500: 1
-        estate_workers_3000: 1
+    tourists:
+      label: นักท่องเที่ยวแถวนี้เยอะไหม
+      tag: ย่านท่องเที่ยว
+      weight: 0.5            # แยกจาก "คนอยู่อาศัย" — โรงแรมคือนักท่องเที่ยว ไม่ใช่คนในพื้นที่
+      measures:
+        lodging_1500: 1
+
+# กันเสียเงิน: หยุดเรียก Google เมื่อใช้ถึงเพดานนี้ในเดือนนั้น (ต่อ SKU, ต่อ billing account)
+# ยอดนับเก็บใน data/cache/usage.json (ข้ามรอบใน GitHub Actions cache)
+budget:
+  monthly_caps:
+    text_search_pro: 4900          # free 5,000
+    place_details_enterprise: 980  # free 1,000
+    places_aggregate: 4950         # free 5,000
+  # ยอดที่ใช้ไปก่อนมีระบบนับ
+  already_used:
+    "2026-10": {text_search_pro: 1138, place_details_enterprise: 700, places_aggregate: 4809}
 
 output:
   top_n_map: 50

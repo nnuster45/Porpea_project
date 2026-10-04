@@ -38,7 +38,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
       STAGES: ${{ inputs.stages }}
       MAX_CALLS: ${{ inputs.max_calls }}
       PYTHONUNBUFFERED: "1"  # show progress in the log as it happens
@@ -52,7 +51,7 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt -c constraints.txt
 
       # data/ ไม่อยู่ใน repo (ข้อมูลจาก Google) — เก็บข้ามรอบใน Actions cache ของ repo นี้
       # (cache ที่ไม่ถูกใช้ 7 วันจะถูกลบ ถ้าหายต้องรัน discover ใหม่)
@@ -73,19 +72,25 @@ jobs:
 
       - name: Check API key
         if: ${{ inputs.stages != 'dashboard' }}
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
           if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
             echo "::error::ยังไม่ได้ตั้ง secret GOOGLE_MAPS_API_KEY (Settings → Secrets and variables → Actions)"
             exit 1
           fi
 
-      - name: 1. Discover markets
-        if: ${{ inputs.stages == 'all' || inputs.stages == 'discover' }}
-        run: python -m sitefinder discover --max-calls "$MAX_CALLS"
-
+      # ดูก่อนเรียก Google: จำนวน call ที่คาดว่าจะใช้ + ใช้ไปแล้วเดือนนี้ / เพดานใน budget
       - name: Estimate quota
         if: ${{ inputs.stages != 'dashboard' }}
         run: python -m sitefinder estimate
+
+      # API key ส่งให้เฉพาะขั้นที่เรียก Google
+      - name: 1. Discover markets
+        if: ${{ inputs.stages == 'all' || inputs.stages == 'discover' }}
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: python -m sitefinder discover --max-calls "$MAX_CALLS"
 
       # สรุปรายชื่อตามประเภท → ดูในหน้า Summary ของ run ไว้ตัดสินใจว่าจะตัดอะไรออก
       - name: Review markets
@@ -94,6 +99,8 @@ jobs:
 
       - name: 2. Enrich (reviews, rating, hours)
         if: ${{ inputs.stages == 'all' || inputs.stages == 'refresh' }}
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: python -m sitefinder enrich --max-calls "$MAX_CALLS"
 
       # OSM จากไฟล์ทั้งประเทศ (Geofabrik) แทน Overpass API — Overpass จำกัดความถี่ IP ของ GitHub หนักมาก
@@ -121,6 +128,8 @@ jobs:
 
       - name: 3. Surroundings
         if: ${{ inputs.stages == 'all' || inputs.stages == 'refresh' }}
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: python -m sitefinder surround --max-calls "$MAX_CALLS"
 
       - name: 4. Score + dashboard
@@ -178,6 +187,6 @@ jobs:
             echo "::warning::ข้าม deploy — ยังไม่ได้ตั้ง secret CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID (โหลด dashboard จาก artifact แทนได้)"
             exit 0
           fi
-          npx --yes wrangler@4 pages project create "$PROJECT" --production-branch=main 2>/dev/null \
+          npx --yes wrangler@4.147.0 pages project create "$PROJECT" --production-branch=main 2>/dev/null \
             && echo "created Pages project $PROJECT" || true
-          npx --yes wrangler@4 pages deploy site --project-name="$PROJECT" --branch=main --commit-dirty=true
+          npx --yes wrangler@4.147.0 pages deploy site --project-name="$PROJECT" --branch=main --commit-dirty=true

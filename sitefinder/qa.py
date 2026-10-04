@@ -8,7 +8,7 @@ import pandas as pd
 
 from .geo import haversine_m
 
-SKIP = {"place_id", "lat", "lng", "keep", "keep_auto", "is_new", "rank"}
+SKIP = {"place_id", "lat", "lng", "keep", "keep_auto", "is_new", "rank", "dup_count"}
 
 
 def _num_cols(df):
@@ -58,10 +58,25 @@ def redundant_pairs(df, cols, threshold=0.85):
     return sorted(out, key=lambda x: -abs(x[2])), corr
 
 
-def report(features_df, ranked=None):
+def report(features_df, ranked=None, raw_count=None, pillars=None):
     df = features_df.reset_index(drop=True)
     cols = _num_cols(df)
-    lines = [f"## QA report — {len(df)} markets", "", "### Distribution of every measure", ""]
+    head = f"## QA report — {len(df)} markets"
+    if raw_count is not None:
+        head += f" (from {raw_count} listings with keep=1; {raw_count - len(df)} merged as duplicates)"
+    lines = [head, ""]
+
+    if "dup_count" in df:
+        merged = df[df["dup_count"] > 0].sort_values("dup_count", ascending=False)
+        lines += [f"### Merged duplicates: {len(merged)} markets absorbed {int(df['dup_count'].sum())} listings", "",
+                  "kept,kept_place_id,merged_names,merged_place_ids"]
+        lines += [f"{r['name']},{r['place_id']},{r['dup_names']},{r['dup_ids']}" for _, r in merged.iterrows()]
+        lines.append("")
+
+    sparse = [(c, (df[c] == 0).mean()) for c in cols if df[c].notna().any() and (df[c] == 0).mean() >= 0.6]
+    lines += ["### Mostly-zero measures (≥60% zeros — percentiles of these mostly reflect map coverage)", ""]
+    lines += [f"- {c}: {z:.0%} zeros" for c, z in sparse] or ["- none"]
+    lines += ["", "### Distribution of every measure", ""]
     lines += distribution_table(df, cols)
     lines += ["", "### Highest values per measure (check these by hand)", ""]
     for c in cols:
@@ -86,10 +101,16 @@ def report(features_df, ranked=None):
         lines += ["", "### Score / pillars", ""]
         pcols = ["score"] + [c for c in ranked.columns if c.startswith("pillar_")]
         lines += distribution_table(ranked, pcols)
+        if len(pcols) > 2:
+            lines += ["", "Pillar correlation (Spearman) — high values mean two pillars measure the same thing:", "",
+                      ranked[pcols[1:]].corr(method="spearman").round(2).to_csv()]
+        if "tier" in ranked:
+            lines += ["Tiers: " + ", ".join(f"{t}={n}" for t, n in ranked["tier"].value_counts().sort_index().items())]
         if "profile" in ranked:
             lines += ["", "Profile tag combinations:", ""]
             lines += [f"- {p or '(none)'}: {n}" for p, n in ranked["profile"].fillna("").value_counts().items()]
-        keep = ["rank", "name", "score"] + pcols[1:] + [c for c in cols if c in ranked.columns]
+        keep = ["rank", "tier", "name", "score"] + pcols[1:] + [c for c in cols if c in ranked.columns]
+        keep = [c for c in keep if c in ranked.columns]
         lines += ["", "### Top 25 with all measures", "", ranked[keep].head(25).to_csv(index=False)]
         lines += ["", "### Bottom 10", "", ranked[keep].tail(10).to_csv(index=False)]
     return "\n".join(lines)

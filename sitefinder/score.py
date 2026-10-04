@@ -1,19 +1,95 @@
 """Stage 4: combine features and rank markets (market-anchored weighted scoring in pillars)."""
 
+import re
+from difflib import SequenceMatcher
+
 import numpy as np
 import pandas as pd
 
+from .geo import haversine_m
 
-def build_features(markets, details, surroundings, rating_prior_reviews=30):
+
+def _norm_name(name):
+    """Name without generic market words, for 'is this the same market' checks."""
+    text = str(name or "").lower()
+    text = re.sub(r"ตลาดนัด|ตลาดสด|ตลาด|market|night|walking street|ถนนคนเดิน|food|the|นัด", " ", text)
+    return re.sub(r"[^0-9a-zก-๙]+", "", text)
+
+
+def _similar(a, b):
+    a, b = _norm_name(a), _norm_name(b)
+    if not a or not b:
+        return False
+    if len(a) >= 3 and len(b) >= 3 and (a in b or b in a):
+        return True
+    return SequenceMatcher(None, a, b).ratio() >= 0.6
+
+
+def dedupe(df, same_site_m=40, similar_name_m=150):
+    """Merge listings of the same market (Google often has several, in several languages).
+
+    Linked when ≤ same_site_m apart, or ≤ similar_name_m apart with similar names. Each group keeps
+    the listing with most reviews, sums the group's reviews (`reviews`), and records the others in
+    `dup_names` / `dup_ids` / `dup_count`.
+    """
+    df = df.reset_index(drop=True)
+    n = len(df)
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    lat, lng = df["lat"].to_numpy(float), df["lng"].to_numpy(float)
+    names = df["name"].tolist()
+    for i in range(n):
+        d = haversine_m(lat[i], lng[i], lat[i + 1:], lng[i + 1:])
+        for j in np.nonzero(d <= similar_name_m)[0]:
+            k = i + 1 + j
+            if d[j] <= same_site_m or _similar(names[i], names[k]):
+                parent[find(i)] = find(k)
+
+    groups = {}
+    for i in range(n):
+        groups.setdefault(find(i), []).append(i)
+
+    reviews = df["reviews"] if "reviews" in df else pd.Series(np.nan, index=df.index)
+    rows = []
+    for members in groups.values():
+        rep = max(members, key=lambda i: -1 if pd.isna(reviews.iloc[i]) else reviews.iloc[i])
+        row = df.iloc[rep].copy()
+        others = [i for i in members if i != rep]
+        r = reviews.iloc[members]
+        row["reviews"] = r.sum() if r.notna().any() else np.nan
+        if "rating" in df and r.notna().any():
+            rated = df.iloc[members][["rating"]].assign(n=r.values).dropna()
+            rated = rated[rated["n"] > 0]
+            if len(rated):
+                row["rating"] = round(float((rated["rating"] * rated["n"]).sum() / rated["n"].sum()), 2)
+        row["dup_count"] = len(others)
+        row["dup_names"] = " | ".join(str(names[i]) for i in others)
+        row["dup_ids"] = " | ".join(str(df.iloc[i]["place_id"]) for i in others)
+        rows.append(row)
+    return pd.DataFrame(rows).reset_index(drop=True)
+
+
+def build_features(markets, details, surroundings, rating_prior_reviews=30, dedupe_cfg=None):
     df = markets.merge(details, on="place_id", how="left").merge(surroundings, on="place_id", how="left")
     if "business_status_now" in df.columns:
-        df = df[df["business_status_now"].fillna("") != "CLOSED_PERMANENTLY"]
+        df = df[~df["business_status_now"].fillna("").isin(["CLOSED_PERMANENTLY", "CLOSED_TEMPORARILY"])]
+    if dedupe_cfg is not None and len(df):
+        df = dedupe(df, **dedupe_cfg)
 
-    n = df["reviews"].fillna(0)
-    df["reviews_log"] = np.log1p(n)
-    # Bayesian average: a 5.0 from 3 reviews should not beat a 4.4 from 2,000
+    # NaN reviews = details could not be fetched (unknown), not "0 reviews"
+    reviews = df["reviews"] if "reviews" in df else pd.Series(np.nan, index=df.index)
+    df["reviews_log"] = np.log1p(reviews)
+    # Bayesian average: a 5.0 from 3 reviews should not beat a 4.4 from 2,000.
+    # No rating → unknown (NaN), so it is neither rewarded nor punished.
+    n = reviews.fillna(0)
     mean = df["rating"].mean() if df["rating"].notna().any() else 0
-    adj = (rating_prior_reviews * mean + n * df["rating"].fillna(mean)) / (rating_prior_reviews + n)
+    adj = (rating_prior_reviews * mean + n * df["rating"]) / (rating_prior_reviews + n)
     # rounded so float noise can't break ties differently here and in the dashboard's JS
     df["rating_adj"] = adj.round(6)
     return df.reset_index(drop=True)
@@ -23,12 +99,36 @@ def build_features(markets, details, surroundings, rating_prior_reviews=30):
 ALIASES = {"reviews": "reviews_log", "rating": "rating_adj"}
 
 
-def score(df, pillars, profile_top_pct=30, log=print):
-    """Rank markets: percentile per measure → weighted mean per pillar → weighted mean of pillars (0–100).
+# tier cut-offs on the score's percentile among markets: close ranks are not meaningfully different
+TIERS = [(0.9, "A"), (0.7, "B"), (0.4, "C"), (0.0, "D")]
 
-    Adds pillar_<key> (0–100), `profile` (tags of pillars where the market is in the top
-    profile_top_pct % of markets) and `why`.
+
+def measure_values(series, scale=None):
+    """A measure → 0..1. Default: percentile rank (ties averaged).
+    'minmax': position between min and max of the values (keeps real gaps, e.g. log of reviews).
+    Unknown values → 0.5 (neutral)."""
+    if scale == "minmax":
+        lo, hi = series.min(), series.max()
+        out = (series - lo) / (hi - lo) if hi > lo else series * 0 + 0.5
+        return out.fillna(0.5)
+    return series.rank(pct=True).fillna(0.5)
+
+
+def tier_of(pct):
+    for cut, name in TIERS:
+        if pct >= cut:
+            return name
+    return TIERS[-1][1]
+
+
+def score(df, pillars, profile_top_pct=30, scales=None, log=print):
+    """Rank markets: each measure → 0..1 (percentile, or min-max for measures in `scales`) → weighted mean
+    per pillar → weighted mean of pillars (0–100).
+
+    Adds pillar_<key> (0–100), `tier` (A/B/C/D by score percentile), `profile` (tags of pillars where the
+    market is in the top profile_top_pct % of markets) and `why`.
     """
+    scales = scales or {}
     pillar_scores, pillar_w, labels = {}, {}, {}
     for pk, p in pillars.items():
         parts = {}
@@ -39,8 +139,7 @@ def score(df, pillars, profile_top_pct=30, log=print):
             if col not in df.columns or df[col].notna().sum() == 0:
                 log(f"  - '{key}' in pillar '{pk}' has no data, ignored")
                 continue
-            # unknown values get the median rank rather than 0 or 1
-            parts[key] = (df[col].rank(pct=True).fillna(0.5), w)
+            parts[key] = (measure_values(df[col], scales.get(key)), w)
         if not parts or not p.get("weight"):
             if p.get("weight"):
                 log(f"  - pillar '{pk}' has no usable measures, ignored")
@@ -66,6 +165,7 @@ def score(df, pillars, profile_top_pct=30, log=print):
     out["why"] = contrib.apply(
         lambda r: ", ".join(labels[k] for k in r.sort_values(ascending=False).index[:2]), axis=1
     )
+    out["tier"] = out["score"].rank(pct=True).map(tier_of)
     out = out.sort_values("score", ascending=False).reset_index(drop=True)
     out.insert(0, "rank", range(1, len(out) + 1))
     return out

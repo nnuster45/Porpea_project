@@ -27,7 +27,8 @@ PILLAR_SETS = {
 
 CFG = {
     "area": {"name": "ชลบุรี"},
-    "scoring": {"rating_prior_reviews": 30, "profile_top_pct": 30, "pillars": PILLAR_SETS["default_like"]},
+    "scoring": {"rating_prior_reviews": 30, "profile_top_pct": 30, "pillars": PILLAR_SETS["default_like"],
+                "scales": {"reviews": "minmax"}},
     "output": {"top_n_map": 10},
 }
 
@@ -67,8 +68,8 @@ def run_js_scoring(payload, prior):
     code = re.search(r"// <scoring>[^\n]*\n(.*?)// </scoring>", js, re.S).group(1)
     script = code + f"""
 const DATA = {json.dumps(payload, ensure_ascii=False)};
-const res = scorePillars(DATA.markets, DATA.pillars, {prior});
-console.log(JSON.stringify({{scores: res.scores, pillars: Object.fromEntries(res.pillars.map(p => [p.key, p.scores]))}}));
+const res = scorePillars(DATA.markets, DATA.pillars, {prior}, DATA.scales);
+console.log(JSON.stringify({{scores: res.scores, tiers: res.tiers, pillars: Object.fromEntries(res.pillars.map(p => [p.key, p.scores]))}}));
 """
     out = subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True)
     return json.loads(out.stdout)
@@ -82,9 +83,10 @@ def test_browser_scores_match_python(features_df, pillar_set):
     payload = build_payload(features_df, cfg)
     js = run_js_scoring(payload, 30)
     ids = [m["id"] for m in payload["markets"]]
-    py = score(features_df, pillars, log=lambda *_: None).set_index("place_id")
-    for pid, js_score in zip(ids, js["scores"]):
+    py = score(features_df, pillars, scales=cfg["scoring"].get("scales"), log=lambda *_: None).set_index("place_id")
+    for pid, js_score, js_tier in zip(ids, js["scores"], js["tiers"]):
         assert js_score == pytest.approx(py.loc[pid, "score"], abs=0.11), pid  # only last-digit rounding may differ
+        assert js_tier == py.loc[pid, "tier"], pid
     assert set(js["pillars"]) == {c[len("pillar_"):] for c in py.columns if c.startswith("pillar_")}
     for key, vals in js["pillars"].items():
         for pid, v in zip(ids, vals):
@@ -106,7 +108,10 @@ def test_payload_shape(features_df):
 
 def test_describe_feature_labels():
     assert describe_feature("conv_store_500") == {"label": "ร้านสะดวกซื้อ", "group": "shops", "unit": "แห่ง", "scale": 1, "radius": 500}
-    assert describe_feature("industrial_ha_1500")["label"] == "พื้นที่โรงงาน"
+    assert describe_feature("industrial_ha_1500")["label"] == "พื้นที่โรงงาน (OSM)"
+    assert describe_feature("campus_3000")["label"].startswith("มหาวิทยาลัย")
+    assert "นับทุกตึก" in describe_feature("university_1500")["label"]  # says what Google actually counts
+    assert describe_feature("lodging_1500")["group"] == "tourism"
     assert describe_feature("industrial_ha_1500")["unit"] == "ไร่"
     assert describe_feature("seven_ปั๊ม_500")["label"] == "7-Eleven · ปั๊ม"
     assert describe_feature("estate_workers_3000")["group"] == "work"
@@ -117,12 +122,15 @@ def test_describe_feature_labels():
 def test_amphoe_and_kind():
     assert amphoe("123 ตำบลหนองปรือ อำเภอบางละมุง ชลบุรี 20150") == "บางละมุง"
     assert amphoe("อ.ศรีราชา จ.ชลบุรี") == "ศรีราชา"
-    assert amphoe("Sattahip District, Chon Buri") == "Sattahip"
+    assert amphoe("Sattahip District, Chon Buri") == "สัตหีบ"
+    assert amphoe("อ.เมือง จ.ชลบุรี") == amphoe("อำเภอเมืองชลบุรี") == "เมืองชลบุรี"
+    assert amphoe("ถ.เลียบหาด เมืองพัทยา ชลบุรี") == "บางละมุง"
     assert amphoe("") == "ไม่ระบุ"
     assert market_kind("ตลาดโต้รุ่งบางแสน") == "ตลาดโต้รุ่ง"
     assert market_kind("Naklua Walking Street") == "ถนนคนเดิน"
     assert market_kind("ตลาดสดหนองมน") == "ตลาดทั่วไป"
-    assert market_kind("ตลาดหนองมน", "ตลาดนัด") == "ตลาดนัด"
+    assert market_kind("ตลาดหนองมน", "ตลาดนัด") == "ตลาดทั่วไป"   # the search keyword doesn't decide the type
+    assert market_kind("ตลาดสดเทศบาลเมืองชลบุรี", "ตลาด|ตลาดโต้รุ่ง") == "ตลาดทั่วไป"
 
 
 def test_render_embeds_data_safely(features_df):

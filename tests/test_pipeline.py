@@ -294,6 +294,8 @@ def test_client_raises_api_error_message(tmp_path):
 from sitefinder.discover import carry_over_keep, suggest_keep  # noqa: E402
 
 DISC = {
+    "never_market_types": ["guest_house", "lodging", "parking", "public_bathroom"],
+    "market_name_words": "market|plaza|พลาซ่า|walking street",
     "suspect_name": "สาขา|^ร้าน|คอนโด",
     "market_types": ["market", "flea_market", "farmers_market", "food_court"],
     "market_name_prefix": "^(?:ตลาด|walking street)",
@@ -322,7 +324,7 @@ def test_suggest_keep_market_types_and_names():
         "g": 1,  # walking street
     }
     assert "branch" in df.loc["b", "note"]
-    assert df.loc["f", "note"] == "not a market type: food"
+    assert df.loc["f", "note"] == "looks like a stall/shop inside a market"
     assert (df["keep_auto"] == df["keep"]).all()
 
 
@@ -618,3 +620,71 @@ def test_surround_uses_local_osm_via_cli(tmp_path, monkeypatch):
     assert isinstance(cli.overpass_client(cfg), LocalOSM)
     cfg["surroundings"]["osm_extra"]["school"] = ['nwr["amenity"="school"]']
     assert not isinstance(cli.overpass_client(cfg), LocalOSM)   # extract lacks a feature → fallback
+
+
+def test_keep_rules_on_cases_found_by_qa():
+    cases = [  # (name, primary_type, expected keep)
+        ("Walking Street Guest House", "guest_house", 0),        # lodging beats the name prefix
+        ("Walking street", "public_bathroom", 0),
+        ("เซเว่นตลาดใหม่อุดมกิตต์", "market", 0),                # stall/shop typed as market
+        ("เจ๊จอม ไก่สด ตลาดสดบ่อวิน", "market", 0),
+        ("Aof.Freshfruit ผลไม้ตลาด SP", "market", 0),
+        ("ตลาดนินจา สาขา 2", "flea_market", 1),                  # a real market branch
+        ("ตลาดนัดคอนโดลุมพินี", "market", 1),
+        ("ตลาดนัดหมู่บ้านชลลดา", "flea_market", 1),
+        ("TANALAI MARKET ตลาดธนาลัย หนองแก", "market", 1),      # market words keep it
+        ("9 กิโลพลาซ่า ศรีราชา", "market", 1),
+        ("7-11 สาขาตลาดนัดมณีแก้ว", "convenience_store", 0),
+        ("Pattaya Marina Night Market", "flea_market", 1),
+    ]
+    df = pd.DataFrame({"place_id": [str(i) for i in range(len(cases))],
+                       "name": [c[0] for c in cases], "primary_type": [c[1] for c in cases]})
+    got = suggest_keep(df, DISC)["keep"].tolist()
+    assert got == [c[2] for c in cases], [(c[0], g) for c, g in zip(cases, got) if g != c[2]]
+
+
+def test_campus_count_counts_institutions_not_buildings(tmp_path):
+    pytest.importorskip("osmium")
+    from sitefinder.osm_local import LocalOSM, extract
+
+    nodes, ways = [], []
+    tag = lambda t: "".join(f'<tag k="{k}" v="{v}"/>' for k, v in t.items())
+    # one university mapped as two touching faculty polygons (west & east halves) at the market
+    west = [(1, 13.0 - 0.001, 100.999), (2, 13.0 - 0.001, 101.0), (3, 13.0 + 0.001, 101.0), (4, 13.0 + 0.001, 100.999)]
+    east = [(2, 0, 0), (5, 13.0 - 0.001, 101.001), (6, 13.0 + 0.001, 101.001), (3, 0, 0)]
+    nodes += [(i, la, lo, {}) for i, la, lo in west] + [(5, 13.0 - 0.001, 101.001, {}), (6, 13.0 + 0.001, 101.001, {})]
+    ways.append((100, [1, 2, 3, 4, 1], {"amenity": "university"}))
+    ways.append((101, [2, 5, 6, 3, 2], {"amenity": "university"}))
+    # a node-only college 1 km north, and a node inside the university (a faculty pin) — not double counted
+    nodes += [(7, 13.009, 101.0, {"amenity": "college"}), (8, 13.0, 101.0005, {"amenity": "university"})]
+    # a separate campus polygon ~2.2 km east
+    far = _square_nodes(20, 13.0, 101.02, 100)
+    nodes += [(i, la, lo, {}) for i, la, lo in far]
+    ways.append((102, [n[0] for n in far] + [far[0][0]], {"amenity": "university"}))
+
+    xml = ['<?xml version="1.0" encoding="UTF-8"?><osm version="0.6" generator="test">']
+    xml += [f'<node id="{i}" version="1" lat="{la}" lon="{lo}">{tag(t)}</node>' for i, la, lo, t in sorted(nodes)]
+    xml += [f'<way id="{i}" version="1">' + "".join(f'<nd ref="{r}"/>' for r in refs) + tag(t) + "</way>" for i, refs, t in ways]
+    xml.append("</osm>")
+    osm = tmp_path / "c.osm"
+    osm.write_text("".join(xml), encoding="utf-8")
+
+    bbox = {"south": 12.9, "north": 13.1, "west": 100.9, "east": 101.1}
+    data = extract(osm, bbox, {}, {}, {"campus": ['nwr["amenity"="university"]', 'nwr["amenity"="college"]']},
+                   log=lambda *_: None)
+    local = LocalOSM(data)
+    assert local.has(["campus"])
+    assert local.campus_count(13.0, 101.0, [500, 1500, 3000], "campus") == {500: 1, 1500: 2, 3000: 3}
+
+
+def test_hours_need_an_hour_in_the_window_and_record_days():
+    def p(od, oh, om, cd, ch, cm):
+        return {"open": {"day": od, "hour": oh, "minute": om}, "close": {"day": cd, "hour": ch, "minute": cm}}
+
+    f = hours_features({"periods": [p(5, 17, 0, 5, 20, 30)]})       # Fri 17:00–20:30
+    assert f["open_evening"] == pytest.approx(1 / 7) and f["open_night"] == 0  # only 30 min after 20:00
+    assert f["open_days"] == "0000010"
+    f = hours_features({"periods": [p(1, 9, 45, 1, 14, 0)]})        # Mon 09:45–14:00
+    assert f["open_morning"] == 0                                    # 15 min before 10:00 is not "morning"
+    f = hours_features({"periods": [p(6, 18, 0, 0, 2, 0)]})          # Sat 18:00 → Sun 02:00
+    assert f["open_night"] == pytest.approx(1 / 7) and f["open_days"] == "1000001"

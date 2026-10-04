@@ -238,11 +238,20 @@ textarea { width: 100%; min-height: 70px; border: 1px solid var(--border); borde
 .prow .pm { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
 .share { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0 2px; gap: 2px; }
 /* pillar identity = categorical slots 1–4, fixed order */
-:root { --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; }
-.share > span:nth-child(4n+1) { background: var(--c1); }
-.share > span:nth-child(4n+2) { background: var(--c2); }
-.share > span:nth-child(4n+3) { background: var(--c3); }
-.share > span:nth-child(4n+4) { background: var(--c4); }
+:root { --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; --c5: #e87ba4; }
+.share > span:nth-child(5n+1) { background: var(--c1); }
+.share > span:nth-child(5n+2) { background: var(--c2); }
+.share > span:nth-child(5n+3) { background: var(--c3); }
+.share > span:nth-child(5n+4) { background: var(--c4); }
+.share > span:nth-child(5n+5) { background: var(--c5); }
+.tier { display: inline-grid; place-items: center; min-width: 22px; height: 20px; border-radius: 6px; font-size: 12px; font-weight: 700;
+  border: 1px solid var(--border); color: var(--text-2); background: var(--surface-2); }
+.tier.tA { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tier.tB { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.notice { font-size: 12.5px; background: var(--accent-soft); color: var(--accent-ink); border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; }
+.notice button { font-size: 12px; padding: 2px 8px; margin-left: 6px; }
+.exrow { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--border); font-size: 12.5px; }
+.exrow .msub { grid-column: 1 / -1; }
 .share-l { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11.5px; color: var(--muted); }
 .share-l i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
 details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; color: var(--text-2); padding: 4px 0; }
@@ -277,7 +286,8 @@ details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; co
   <aside class="side" id="side">
     <section class="card">
       <h2><span class="step">1</span>ให้ความสำคัญกับอะไร</h2>
-      <p class="hint">ทุกตลาดถูกเทียบกันใน 4 หมวด — เลื่อนไปทางขวา = สำคัญมาก, ซ้ายสุด = ไม่นำมาคิด</p>
+      <p class="hint">ทุกตลาดถูกเทียบกันในแต่ละหมวด — เลื่อนไปทางขวา = สำคัญมาก, ซ้ายสุด = ไม่นำมาคิด</p>
+      <div id="custom-note" class="notice" hidden></div>
       <div id="presets" class="chips" style="margin-bottom:8px"></div>
       <div id="pillars"></div>
       <div class="share" id="share" aria-hidden="true"></div>
@@ -314,14 +324,22 @@ details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; co
           <label><input type="checkbox" id="f-evening">เย็น</label>
           <label><input type="checkbox" id="f-night">ดึก</label>
         </div>
+        <p class="hint" style="margin:4px 0 0">นับเมื่อเปิดอย่างน้อย 1 ชม. ในช่วง เช้า 06–10 · เย็น 16–20 · ดึก 20–02</p>
       </div>
+      <div class="field"><label class="lbl">ต้องเปิดวัน (วันที่คุณว่างไปขาย)</label><div class="chips" id="f-days"></div></div>
+      <div class="field checks"><label><input type="checkbox" id="f-unknown" checked>รวมตลาดที่ไม่ทราบเวลาเปิด (<span id="n-unknown">0</span>)</label></div>
       <div class="field checks"><label><input type="checkbox" id="f-short">เฉพาะที่ติดดาว ★</label></div>
     </section>
 
     <section class="card">
-      <h2>ตลาดที่ซ่อน (ไม่ใช่ตลาด)</h2>
-      <p class="hint">กด “ไม่ใช่ตลาด” ในแผงรายละเอียดเพื่อซ่อน แล้วดาวน์โหลด keep.csv ไป commit ที่ <code>review/keep.csv</code> — รอบหน้าจะไม่เสีย quota กับที่เหล่านี้</p>
+      <h2>คัดรายชื่อตลาด</h2>
+      <p class="hint">กด “🚫 ไม่ใช่ตลาด” ในแผงรายละเอียด — ที่ซ่อนจะไม่ถูกนำมาคิดอันดับทันที แล้ว ⬇ keep.csv ไปแทน <code>review/keep.csv</code> (รวมของเดิมให้แล้ว) — รอบหน้าจะไม่เสีย quota กับที่เหล่านี้</p>
       <div class="field checks"><label><input type="checkbox" id="f-hidden">แสดงที่ซ่อนไว้ (<span id="n-hidden">0</span>)</label></div>
+      <details class="adv" id="exbox">
+        <summary>ที่ระบบตัดออกอัตโนมัติ (<span id="n-excluded">0</span>) — ตรวจ / เอากลับมา</summary>
+        <div class="field"><input type="search" id="ex-q" placeholder="ค้นหาชื่อ"></div>
+        <div id="exlist"></div>
+      </details>
       <div class="btnrow"><button id="btn-keep">⬇ keep.csv</button></div>
     </section>
 
@@ -339,6 +357,11 @@ details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; co
         <label class="lbl" for="o-top">ไฮไลต์บนแผนที่ (หมุดใหญ่): <b id="o-top-v"></b> อันดับแรก</label>
         <input type="range" id="o-top" min="5" max="100" step="5">
       </div>
+      <div class="btnrow" style="margin-bottom:10px">
+        <button id="btn-backup">⬇ สำรองดาว/บันทึก</button>
+        <label class="linkbtn" style="cursor:pointer">⬆ นำเข้า<input type="file" id="in-backup" accept="application/json" hidden></label>
+      </div>
+      <p class="hint">ดาว บันทึก และที่ซ่อน เก็บในเบราว์เซอร์นี้เท่านั้น (iPhone อาจลบถ้าไม่ได้เปิด 7 วัน) — สำรองไว้เป็นระยะ</p>
       <div class="info">
         ค่าเหล่านี้ต้อง <b>ดึงข้อมูลใหม่</b> — แก้ใน <code>config.yaml</code> แล้วรันคำสั่ง:
         <ul style="margin:4px 0 0;padding-left:18px">
@@ -362,6 +385,7 @@ details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; co
           <span><i style="background:var(--s2)"></i>40–55</span>
           <span><i style="background:var(--s1)"></i>&lt;40</span>
         </div>
+        <div style="margin-top:4px">กลุ่ม A = top 10% · B = 10–30% · C = 30–60%</div>
       </div>
     </div>
     <div class="tablebox" id="tablebox">
@@ -399,29 +423,44 @@ function percentiles(values) {
 }
 
 function ratingAdj(markets, prior) {
+  // no rating → unknown (null): neither rewarded nor punished
   const rs = markets.map(m => m.rating).filter(r => r !== null && r !== undefined);
   const mean = rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 0;
   return markets.map(m => {
+    if (m.rating === null || m.rating === undefined) return null;
     const n = m.reviews ?? 0;
-    const r = m.rating ?? mean;
-    return Math.round((prior * mean + n * r) / (prior + n) * 1e6) / 1e6;
+    return Math.round((prior * mean + n * m.rating) / (prior + n) * 1e6) / 1e6;
   });
 }
 
+const isNum = x => x !== null && x !== undefined && !Number.isNaN(x);
+
 function featureValues(markets, key, prior) {
-  if (key === "reviews") return markets.map(m => m.reviews ?? 0);
+  // reviews: null = details could not be fetched (unknown), 0 = really no reviews
+  if (key === "reviews") return markets.map(m => (isNum(m.reviews) ? Math.log1p(m.reviews) : null));
   if (key === "rating") return ratingAdj(markets, prior);
   return markets.map(m => (m.f[key] === undefined ? null : m.f[key]));
 }
 
-// percentile per measure → weighted mean inside each pillar → weighted mean of pillars → 0–100
-function scorePillars(markets, pillars, prior) {
+// a measure → 0..1: percentile rank, or position between min and max for "minmax" measures
+function measureValues(values, scale) {
+  if (scale === "minmax") {
+    const v = values.filter(isNum);
+    if (!v.length) return null;
+    const lo = Math.min(...v), hi = Math.max(...v);
+    return values.map(x => (isNum(x) ? (hi > lo ? (x - lo) / (hi - lo) : 0.5) : null));
+  }
+  return values.some(isNum) ? percentiles(values) : null;
+}
+
+const TIERS = [[0.9, "A"], [0.7, "B"], [0.4, "C"], [0, "D"]];
+const tierOf = pct => (TIERS.find(([cut]) => pct >= cut) || TIERS[TIERS.length - 1])[1];
+
+// measure → 0..1 → weighted mean inside each pillar → weighted mean of pillars → 0–100 → tier
+function scorePillars(markets, pillars, prior, scales = {}) {
   const cache = {};
   const pctOf = key => {
-    if (!(key in cache)) {
-      const v = featureValues(markets, key, prior);
-      cache[key] = v.some(x => x !== null && x !== undefined) ? percentiles(v) : null;
-    }
+    if (!(key in cache)) cache[key] = measureValues(featureValues(markets, key, prior), scales[key]);
     return cache[key];
   };
   const used = [];
@@ -441,13 +480,16 @@ function scorePillars(markets, pillars, prior) {
   const totalW = used.reduce((a, p) => a + Math.abs(p.weight), 0);
   const scores = markets.map((_, i) =>
     totalW ? Math.round(used.reduce((a, p) => a + p.scores[i] * p.weight, 0) / totalW * 100 * 10) / 10 : 0);
-  return { scores, pillars: used, totalW, pctOf };
+  const tiers = percentiles(scores).map(tierOf);
+  return { scores, tiers, pillars: used, totalW, pctOf };
 }
 // </scoring>
 
 /* ================= UI ================= */
 const KIND_ORDER = ["ตลาดนัด", "ตลาดเย็น", "ตลาดเช้า", "ตลาดโต้รุ่ง", "ถนนคนเดิน", "ตลาดกลางคืน", "ตลาดทั่วไป"];
-const SHORT = { market: "ตลาด", activity: "คึกคัก", residents: "ที่พัก", workers: "ทำงาน" };
+const SHORT = { market: "ตลาด", activity: "คึกคัก", residents: "ที่พัก", workers: "ทำงาน", tourists: "ท่องเที่ยว" };
+const DAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];  // Sunday first, like Google
+const dayText = mask => (mask || "").split("").map((c, d) => (c === "1" ? DAYS[d] : null)).filter(Boolean).join(" ");
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (v, d = 0) => (v === null || v === undefined || Number.isNaN(v)) ? "–" : Number(v).toLocaleString("th-TH", { maximumFractionDigits: d, minimumFractionDigits: 0 });
@@ -464,26 +506,33 @@ const radTag = key => FEAT[key]?.radius ? `<span class="rad">≤ ${radLabel(FEAT
 function load() {
   try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
 }
+const BASE = JSON.stringify(DATA.pillars);  // weights from config.yaml this page was built with
 function save() {
   try {
+    const custom = JSON.stringify(S.pillars) !== BASE;
     localStorage.setItem(STORE_KEY, JSON.stringify({
-      shortlist: S.shortlist, notes: S.notes, hidden: S.hidden, presets: S.presets, pillars: S.pillars,
+      shortlist: S.shortlist, notes: S.notes, hidden: S.hidden, restored: S.restored, presets: S.presets,
+      // only remember weights the user changed, and only against the same config
+      pillars: custom ? S.pillars : null, base: BASE,
       prior: S.prior, topN: S.topN, topPct: S.thr,
     }));
   } catch (e) { /* storage unavailable — page still works */ }
 }
 
 const saved = load();
+const configChanged = !!(saved.pillars && saved.base !== BASE);
 const S = {
-  pillars: saved.pillars && saved.pillars.length ? saved.pillars : clone(DATA.pillars),
+  pillars: saved.pillars && !configChanged ? saved.pillars : clone(DATA.pillars),
   presets: saved.presets || {},
   prior: saved.prior ?? DATA.ratingPrior,
   topN: saved.topN ?? DATA.topN,
   thr: saved.topPct ?? DATA.profileTopPct,
   shortlist: saved.shortlist || {},
   hidden: saved.hidden || {},
+  restored: saved.restored || {},
   notes: saved.notes || {},
-  filters: { q: "", kinds: new Set(), profiles: new Set(), amphoe: "", minReviews: 0, morning: false, evening: false, night: false, short: false, showHidden: false },
+  filters: { q: "", kinds: new Set(), profiles: new Set(), days: new Set(), amphoe: "", minReviews: 0,
+             morning: false, evening: false, night: false, unknown: true, short: false, showHidden: false },
   sort: { key: "score", dir: -1 },
   selected: null,
 };
@@ -517,6 +566,17 @@ function measureSummary(p) {
   return (items.length ? items.join(" · ") : "ยังไม่มีตัววัด") + (missing.length ? `<br><span style="opacity:.75">ไม่มีข้อมูล: ${missing.join(" · ")}</span>` : "");
 }
 
+function renderNotice() {
+  const el = $("custom-note");
+  const custom = JSON.stringify(S.pillars) !== BASE;
+  el.hidden = !custom && !configChanged;
+  el.innerHTML = custom
+    ? `กำลังใช้น้ำหนักที่ปรับเอง (ไม่ใช่ค่าใน config)<button id="note-reset">คืนค่า config</button>`
+    : "ค่าน้ำหนักใน config เปลี่ยน — ใช้ค่าใหม่แทนที่เคยปรับไว้";
+  const b = $("note-reset");
+  if (b) b.onclick = () => { S.pillars = clone(DATA.pillars); renderAll(); };
+}
+
 function renderPillars() {
   const box = $("pillars");
   box.innerHTML = "";
@@ -532,7 +592,7 @@ function renderPillars() {
       p.weight = parseFloat(input.value);
       row.querySelector("output").textContent = p.weight;
       row.classList.toggle("off", !p.weight);
-      renderShare(); renderPresets();
+      renderShare(); renderPresets(); renderNotice();
       scheduleUpdate();
     };
     box.appendChild(row);
@@ -543,9 +603,9 @@ function renderPillars() {
 function renderShare() {
   const tot = S.pillars.reduce((a, p) => a + Math.abs(p.weight), 0) || 1;
   $("share").innerHTML = S.pillars.map(p => `<span style="flex:${Math.abs(p.weight)}"></span>`).join("");
-  const colors = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)"];
+  const colors = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)"];
   $("share-l").innerHTML = S.pillars.map((p, i) =>
-    `<span><i style="background:${colors[i % 4]}"></i>${esc(SHORT[p.key] || p.label)} ${Math.round(Math.abs(p.weight) / tot * 100)}%</span>`).join("");
+    `<span><i style="background:${colors[i % 5]}"></i>${esc(SHORT[p.key] || p.label)} ${Math.round(Math.abs(p.weight) / tot * 100)}%</span>`).join("");
 }
 
 function renderAdvanced() {
@@ -584,6 +644,7 @@ function renderAdvanced() {
     if (r) r.oninput = () => {
       pillarOf(key).measures[key] = parseFloat(r.value);
       el.querySelector("output").textContent = r.value;
+      renderNotice();
       scheduleUpdate();
     };
   });
@@ -620,6 +681,10 @@ function setupFilters() {
   for (const k of ["morning", "evening", "night"]) $("f-" + k).onchange = e => { S.filters[k] = e.target.checked; update(); };
   $("f-short").onchange = e => { S.filters.short = e.target.checked; update(); };
   $("f-hidden").onchange = e => { S.filters.showHidden = e.target.checked; update(); };
+  $("f-unknown").onchange = e => { S.filters.unknown = e.target.checked; update(); };
+  $("n-unknown").textContent = fmt(MARKETS.filter(m => !isNum(m.f.days_open)).length);
+  chipFilter("f-days", DAYS.map((d, i) => [i]), S.filters.days, i => DAYS[i]);
+  setupExcluded();
 
   const bind = (id, key) => {
     const el = $(id);
@@ -632,12 +697,14 @@ function setupFilters() {
 // a market gets a pillar's tag when it is in the top S.thr % of markets for that pillar
 function profiles(i) {
   if (!S.res.ranks) S.res.ranks = Object.fromEntries(S.res.pillars.map(p => [p.key, percentiles(p.scores)]));
-  return S.res.pillars.filter(p => p.tag && S.res.ranks[p.key][i] >= 1 - S.thr / 100).map(p => p.tag);
+  return S.res.pillars.filter(p => p.tag && isNum(S.res.ranks[p.key][i]) && S.res.ranks[p.key][i] >= 1 - S.thr / 100).map(p => p.tag);
 }
 
 function passes(m, i) {
   const F = S.filters;
   if (S.hidden[m.id] && !F.showHidden) return false;
+  const timeFilter = F.morning || F.evening || F.night || F.days.size;
+  if (timeFilter && !isNum(m.f.days_open)) return F.unknown;  // unknown hours: keep or drop, as the user chose
   if (F.q && !(m.name + " " + m.address).toLowerCase().includes(F.q)) return false;
   if (F.kinds.size && !F.kinds.has(m.kind)) return false;
   if (F.profiles.size && !profiles(i).some(t => F.profiles.has(t))) return false;
@@ -646,6 +713,7 @@ function passes(m, i) {
   if (F.morning && !(m.f.open_morning > 0)) return false;
   if (F.evening && !(m.f.open_evening > 0)) return false;
   if (F.night && !(m.f.open_night > 0)) return false;
+  if (F.days.size && ![...F.days].some(d => (m.days || "")[d] === "1")) return false;
   if (F.short && !S.shortlist[m.id]) return false;
   return true;
 }
@@ -658,17 +726,37 @@ function scheduleUpdate() {
   requestAnimationFrame(() => { pending = false; update(); });
 }
 
+// score only the markets the user hasn't hidden; results are re-indexed to MARKETS (hidden → null)
+function compute() {
+  const idx = MARKETS.map((m, i) => i).filter(i => !S.hidden[MARKETS[i].id]);
+  const sub = idx.map(i => MARKETS[i]);
+  const r = scorePillars(sub, S.pillars, S.prior, DATA.scales || {});
+  const expand = arr => { const out = new Array(MARKETS.length).fill(null); idx.forEach((g, k) => { out[g] = arr[k]; }); return out; };
+  const memo = {};
+  return {
+    n: sub.length,
+    scores: expand(r.scores),
+    tiers: expand(r.tiers),
+    totalW: r.totalW,
+    pillars: r.pillars.map(p => ({ ...p, scores: expand(p.scores), parts: p.parts.map(x => ({ ...x, pct: expand(x.pct) })) })),
+    pctOf: key => (key in memo ? memo[key] : (memo[key] = (v => (v ? expand(v) : null))(r.pctOf(key)))),
+    // raw values of the active markets, for "more than X% of markets" texts
+    valuesOf: key => featureValues(sub, key, S.prior).filter(isNum),
+    rawOf: key => expand(featureValues(sub, key, S.prior)),
+  };
+}
+
 function update() {
-  S.res = scorePillars(MARKETS, S.pillars, S.prior);
-  const order = MARKETS.map((m, i) => i).sort((a, b) => S.res.scores[b] - S.res.scores[a]);
-  S.rank = new Array(MARKETS.length);
+  S.res = compute();
+  const order = MARKETS.map((m, i) => i).filter(i => isNum(S.res.scores[i])).sort((a, b) => S.res.scores[b] - S.res.scores[a]);
+  S.rank = new Array(MARKETS.length).fill(null);
   order.forEach((i, r) => { S.rank[i] = r + 1; });
 
   const rows = MARKETS.map((m, i) => i).filter(i => passes(MARKETS[i], i));
   const { key: k, dir: d } = S.sort;
   const pill = S.res.pillars.find(p => "p_" + p.key === k);
-  const val = i => k === "score" ? S.res.scores[i] : k === "name" ? MARKETS[i].name
-    : pill ? pill.scores[i] : k === "rating" ? (MARKETS[i].rating ?? -1) : (MARKETS[i].reviews ?? -1);
+  const val = i => k === "score" ? (S.res.scores[i] ?? -1) : k === "name" ? MARKETS[i].name
+    : pill ? (pill.scores[i] ?? -1) : k === "rating" ? (MARKETS[i].rating ?? -1) : (MARKETS[i].reviews ?? -1);
   rows.sort((a, b) => {
     const va = val(a), vb = val(b);
     return (typeof va === "string" ? va.localeCompare(vb, "th") : va - vb) * d;
@@ -679,6 +767,7 @@ function update() {
   $("st-total").textContent = fmt(MARKETS.length);
   $("st-short").textContent = fmt(Object.values(S.shortlist).filter(Boolean).length);
   $("n-hidden").textContent = fmt(Object.keys(S.hidden).length);
+  renderNotice();
   renderTable();
   renderMap();
   if (S.selected !== null) renderDetail(S.selected);
@@ -694,12 +783,12 @@ function openTags(m) {
   if (m.f.open_night > 0) t.push("ดึก");
   if (days === null || days === undefined) return `<span class="msub">ไม่ทราบเวลา</span>`;
   const n = Math.round(days * 7);
-  return t.map(x => `<span class="tag">${x}</span>`).join("") + `<span class="msub days"> ${n === 7 ? "ทุกวัน" : n + " วัน/สัปดาห์"}</span>`;
+  return t.map(x => `<span class="tag">${x}</span>`).join("") + `<span class="msub days"> ${n === 7 ? "ทุกวัน" : esc(dayText(m.days))}</span>`;
 }
 
 function renderHead() {
   const th = (key, label, cls = "") => `<th class="sortable ${cls}" data-sort="${key}">${label}${S.sort.key === key ? ` <span class="arrow">${S.sort.dir < 0 ? "▼" : "▲"}</span>` : ""}</th>`;
-  $("thead-row").innerHTML = `<th></th><th class="num">#</th>${th("name", "ตลาด")}${th("score", "คะแนน")}` +
+  $("thead-row").innerHTML = `<th></th><th class="num">#</th>${th("name", "ตลาด")}${th("score", "กลุ่ม · คะแนน")}` +
     S.res.pillars.map(p => th("p_" + p.key, esc(SHORT[p.key] || p.label), "col-pillar")).join("") +
     `${th("reviews", "รีวิว", "num")}<th class="col-open">เปิด</th><th class="col-tags">ย่าน</th>`;
   document.querySelectorAll("#thead-row th.sortable").forEach(el => el.onclick = () => {
@@ -721,14 +810,15 @@ function renderTable() {
     const m = MARKETS[i], s = S.res.scores[i];
     const tags = profiles(i).map(t => `<span class="tag on">${esc(t)}</span>`).join("");
     const pcells = S.res.pillars.map(p => {
-      const v = p.scores[i] * 100;
-      return `<td class="col-pillar" title="${esc(p.label)}: ${fmt(v)}"><div class="minibar"><b>${fmt(v)}</b><div class="bar"><span style="width:${Math.max(0, Math.min(100, v))}%"></span></div></div></td>`;
+      const v = isNum(p.scores[i]) ? p.scores[i] * 100 : null;
+      return `<td class="col-pillar" title="${esc(p.label)}: ${fmt(v)}"><div class="minibar"><b>${fmt(v)}</b><div class="bar"><span style="width:${Math.max(0, Math.min(100, v || 0))}%"></span></div></div></td>`;
     }).join("");
     return `<tr data-i="${i}" class="${S.selected === i ? "sel" : ""} ${S.hidden[m.id] ? "hid" : ""}">
       <td><button class="star" data-star="${i}" aria-pressed="${!!S.shortlist[m.id]}" aria-label="ติดดาว">${S.shortlist[m.id] ? "★" : "☆"}</button></td>
-      <td class="rank num">${S.rank[i]}</td>
-      <td><div class="mname">${esc(m.name)}</div><div class="msub">${esc(m.kind)} · ${esc(m.amphoe)}${m.rating ? ` · ★ ${Number(m.rating).toFixed(1)}` : ""}</div></td>
-      <td><div class="scorecell"><b>${fmt(s, 1)}</b><div class="bar"><span style="width:${Math.max(0, Math.min(100, s))}%"></span></div></div></td>
+      <td class="rank num">${S.rank[i] ?? "–"}</td>
+      <td><div class="mname">${esc(m.name)}${m.dups ? ` <span class="rad" title="${esc(m.dups)}">+${m.dups.split(" | ").length} listing</span>` : ""}</div>
+        <div class="msub">${esc(m.kind)} · ${esc(m.amphoe)}${m.rating ? ` · ★ ${Number(m.rating).toFixed(1)}` : ""}${m.days ? ` · ${esc(dayText(m.days) || "-")}` : ""}</div></td>
+      <td><div class="scorecell">${S.res.tiers[i] ? `<span class="tier t${S.res.tiers[i]}">${S.res.tiers[i]}</span>` : ""}<b>${fmt(s, 1)}</b><div class="bar"><span style="width:${Math.max(0, Math.min(100, s || 0))}%"></span></div></div></td>
       ${pcells}
       <td class="num">${fmt(m.reviews)}</td>
       <td class="col-open">${openTags(m)}</td>
@@ -775,7 +865,7 @@ function setupMap() {
 function renderMap() {
   if (!map) return;
   const visible = new Set(S.rows);
-  const drawOrder = MARKETS.map((m, i) => i).sort((a, b) => S.res.scores[a] - S.res.scores[b]);
+  const drawOrder = MARKETS.map((m, i) => i).sort((a, b) => (S.res.scores[a] ?? -1) - (S.res.scores[b] ?? -1));
   for (const i of drawOrder) {
     const mk = markers[i];
     if (!mk) continue;
@@ -783,10 +873,10 @@ function renderMap() {
     const s = S.res.scores[i];
     const sel = S.selected === i;
     mk.setStyle({
-      fillColor: scoreHex(s), radius: sel ? 11 : S.rank[i] <= S.topN ? 8 : 5,
+      fillColor: isNum(s) ? scoreHex(s) : "#9a9a96", radius: sel ? 11 : (S.rank[i] && S.rank[i] <= S.topN) ? 8 : 5,
       color: sel ? "#0b0b0b" : "#ffffff", weight: sel ? 3 : 1.5,
     });
-    mk.unbindTooltip().bindTooltip(`<b>#${S.rank[i]} ${esc(MARKETS[i].name)}</b><br>คะแนน ${fmt(s, 1)}`, { direction: "top", offset: [0, -6] });
+    mk.unbindTooltip().bindTooltip(`<b>${S.res.tiers[i] ? S.res.tiers[i] + " · " : ""}#${S.rank[i] ?? "–"} ${esc(MARKETS[i].name)}</b><br>คะแนน ${fmt(s, 1)}`, { direction: "top", offset: [0, -6] });
     if (!map.hasLayer(mk)) mk.addTo(map);
     mk.bringToFront();
   }
@@ -809,7 +899,7 @@ function select(i, fromTable) {
 function valueText(key, m, i) {
   const f = FEAT[key] || { scale: 1, unit: "" };
   if (key === "rating") {
-    const adj = ratingAdj(MARKETS, S.prior)[i];
+    const adj = S.res.rawOf("rating")[i];
     return m.rating ? `${Number(m.rating).toFixed(1)} → ${fmt(adj, 2)}` : "–";
   }
   const raw = key === "reviews" ? m.reviews : m.f[key];
@@ -818,17 +908,31 @@ function valueText(key, m, i) {
   return `${fmt(v, v < 10 && f.scale !== 1 ? 1 : 0)} ${esc(f.unit || "")}`;
 }
 
+// "more than X% of markets" = share with a strictly smaller value; ties are said separately
+function compareText(key, i) {
+  const v = S.res.rawOf(key)[i];
+  if (!isNum(v)) return null;
+  const vals = S.res.valuesOf(key);
+  const less = vals.filter(x => x < v).length / vals.length;
+  const same = vals.filter(x => x === v).length;
+  let t = `มากกว่า ${Math.round(less * 100)}% ของตลาด`;
+  if (same > 1 && same / vals.length >= 0.1) t += ` · เท่ากับอีก ${fmt(same - 1)} ตลาด`;
+  return { less, t };
+}
+
 function measureRow(key, m, i, w) {
-  const pct = S.res.pctOf(key);
-  const p = pct ? pct[i] : null;
+  const c = compareText(key, i);
+  const pts = S.res.pctOf(key);
+  const used = pts ? pts[i] : null;
   return `<div class="frow"><div>${esc(FEAT[key]?.label || key)}${radTag(key)}${w ? `<span class="rad" style="color:var(--accent-ink)">น้ำหนัก ${w}</span>` : ""}</div>
     <div class="v">${valueText(key, m, i)}</div>
-    ${p === null || p === undefined ? `<div class="p">ไม่มีข้อมูล — นับเป็นกลาง ๆ (50%)</div>` : `<div class="p"><div class="bar"><span style="width:${p * 100}%"></span></div>มากกว่า ${Math.round(p * 100)}% ของตลาด</div>`}</div>`;
+    ${!c ? `<div class="p">ไม่มีข้อมูล — คิดเป็นกลาง ๆ (50%)</div>` : `<div class="p"><div class="bar"><span style="width:${(isNum(used) ? used : c.less) * 100}%"></span></div>${c.t}</div>`}</div>`;
 }
 
 function renderDetail(i) {
   const m = MARKETS[i], s = S.res.scores[i];
-  const blocks = S.res.pillars.map(p => {
+  const hidden = !isNum(s);
+  const blocks = hidden ? "" : S.res.pillars.map(p => {
     const v = p.scores[i] * 100;
     const pts = p.scores[i] * p.weight / S.res.totalW * 100;
     const max = Math.abs(p.weight) / S.res.totalW * 100;
@@ -846,8 +950,11 @@ function renderDetail(i) {
     <div class="msub">${esc(m.kind)} · อ.${esc(m.amphoe)}</div>
     <h3>${esc(m.name)}</h3>
     <div class="msub">${esc(m.address)}</div>
-    <div class="bigscore"><b style="color:${s >= 55 ? "var(--accent-ink)" : "var(--text)"}">${fmt(s, 1)}</b><span>คะแนน · อันดับ ${S.rank[i]} จาก ${MARKETS.length}</span></div>
+    <div class="bigscore">${S.res.tiers[i] ? `<span class="tier t${S.res.tiers[i]}" style="font-size:15px;height:28px;min-width:30px">${S.res.tiers[i]}</span>` : ""}<b style="color:${s >= 55 ? "var(--accent-ink)" : "var(--text)"}">${fmt(s, 1)}</b><span>${hidden ? "ซ่อนไว้ — ไม่นำมาคิดอันดับ" : `คะแนน · อันดับ ${S.rank[i]} จาก ${S.res.n}`}</span></div>
+    ${hidden ? "" : `<p class="hint" style="margin:0 0 6px">อันดับที่ใกล้กันไม่ได้ต่างกันจริง — ดูกลุ่ม A/B/C/D เป็นหลัก</p>`}
     ${tags ? `<div>${tags}</div>` : ""}
+    ${m.days ? `<div class="msub" style="margin-top:6px">เปิด: ${esc(dayText(m.days) || "ไม่ระบุ")}</div>` : `<div class="msub" style="margin-top:6px">ไม่ทราบวัน/เวลาเปิด — ตรวจหน้างานหรือเพจของตลาด</div>`}
+    ${m.dups ? `<div class="msub" style="margin-top:4px">รวม listing ซ้ำใน Google แล้ว: ${esc(m.dups)}</div>` : ""}
     <div class="btnrow">
       <button class="star" id="d-star" aria-pressed="${!!S.shortlist[m.id]}" style="border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:14px">${S.shortlist[m.id] ? "★ ติดดาวแล้ว" : "☆ ติดดาวไว้ลงพื้นที่"}</button>
       ${m.url ? `<a class="linkbtn" href="${esc(m.url)}" target="_blank" rel="noopener">เปิดใน Google Maps ↗</a>` : ""}
@@ -855,7 +962,7 @@ function renderDetail(i) {
     </div>
 
     <h4>คะแนนมาจากไหน</h4>
-    ${blocks || `<p class="hint">ยังไม่ได้ให้น้ำหนักหมวดใด</p>`}
+    ${blocks || `<p class="hint">${hidden ? "ซ่อนไว้ จึงไม่ได้คิดคะแนน — กด “เอากลับมา” เพื่อคิดใหม่" : "ยังไม่ได้ให้น้ำหนักหมวดใด"}</p>`}
 
     <h4>บันทึกของคุณ</h4>
     <textarea id="d-note" placeholder="เช่น ไปดูวันเสาร์ คนเยอะช่วง 18:00, ค่าแผง 150 บาท/วัน">${esc(S.notes[m.id] || "")}</textarea>
@@ -930,16 +1037,17 @@ $("btn-reset").onclick = () => { S.pillars = clone(DATA.pillars); renderAll(); }
 
 $("btn-export").onclick = () => {
   const feats = DATA.features.filter(f => f.key !== "reviews" && f.key !== "rating");
-  const head = ["อันดับ", "ชื่อตลาด", "ประเภท", "อำเภอ", "คะแนน", ...S.res.pillars.map(p => p.label), "ย่าน", "รีวิว", "เรตติ้ง", "ติดดาว", "บันทึก",
-    "เวลาเปิด", "ที่อยู่", "Google Maps", "lat", "lng",
+  const head = ["อันดับ", "กลุ่ม", "ชื่อตลาด", "ประเภท", "อำเภอ", "คะแนน", ...S.res.pillars.map(p => p.label), "ย่าน", "รีวิว", "เรตติ้ง", "ติดดาว", "บันทึก",
+    "วันที่เปิด", "เวลาเปิด", "listing ซ้ำที่รวมแล้ว", "ที่อยู่", "Google Maps", "lat", "lng",
     ...feats.map(f => f.label + (f.radius ? ` ≤${radLabel(f.radius)}` : "") + (f.unit ? ` (${f.unit})` : ""))];
   const q = v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const lines = [head.map(q).join(",")];
   for (const i of S.rows) {
     const m = MARKETS[i];
-    lines.push([S.rank[i], m.name, m.kind, m.amphoe, S.res.scores[i], ...S.res.pillars.map(p => Math.round(p.scores[i] * 1000) / 10),
+    lines.push([S.rank[i] ?? "", S.res.tiers[i] ?? "", m.name, m.kind, m.amphoe, S.res.scores[i] ?? "",
+      ...S.res.pillars.map(p => (isNum(p.scores[i]) ? Math.round(p.scores[i] * 1000) / 10 : "")),
       profiles(i).join(" / "), m.reviews, m.rating, S.shortlist[m.id] ? "★" : "", S.notes[m.id] || "",
-      m.hours, m.address, m.url, m.lat, m.lng,
+      dayText(m.days), m.hours, m.dups, m.address, m.url, m.lat, m.lng,
       ...feats.map(f => m.f[f.key] === null || m.f[f.key] === undefined ? "" : +(m.f[f.key] * (f.scale || 1)).toFixed(2))].map(q).join(","));
   }
   const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -950,24 +1058,67 @@ $("btn-export").onclick = () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
 
-$("btn-keep").onclick = () => {
-  const ids = Object.keys(S.hidden);
-  if (!ids.length) { modal(`<h3>ยังไม่มีตลาดที่ซ่อน</h3><p class="hint">คลิกตลาด แล้วกด “🚫 ไม่ใช่ตลาด” ในแผงรายละเอียด</p><div class="btnrow"><button data-close>ปิด</button></div>`); return; }
-  const q = v => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
-  const lines = ["place_id,keep,note", ...ids.map(id => [id, 0, (S.notes[id] || "ซ่อนจาก dashboard").replace(/\n/g, " ")].map(v => q(String(v))).join(","))];
-  const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+function download(name, text, type) {
+  const blob = new Blob([text], { type });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "keep.csv";
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// keep.csv = rows already in review/keep.csv (embedded when the page was built)
+//          + markets hidden here (keep=0) + auto-excluded places restored here (keep=1)
+$("btn-keep").onclick = () => {
+  const rows = new Map((DATA.review || []).map(r => [r.id, { keep: r.keep, note: r.note }]));
+  for (const id of Object.keys(S.hidden)) rows.set(id, { keep: 0, note: S.notes[id] || "ซ่อนจาก dashboard" });
+  for (const id of Object.keys(S.restored)) rows.set(id, { keep: 1, note: "เอากลับจาก dashboard" });
+  if (!rows.size) { modal(`<h3>ยังไม่มีอะไรต้องบันทึก</h3><p class="hint">กด “🚫 ไม่ใช่ตลาด” ในแผงรายละเอียด หรือ “เอากลับมา” ในรายการที่ระบบตัดออก</p><div class="btnrow"><button data-close>ปิด</button></div>`); return; }
+  const q = v => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  const lines = ["place_id,keep,note", ...[...rows].map(([id, r]) => [id, r.keep, String(r.note || "").replace(/\n/g, " ")].map(v => q(String(v))).join(","))];
+  download("keep.csv", "﻿" + lines.join("\n"), "text/csv;charset=utf-8");
+};
+
+/* ---------- auto-excluded places: review / restore ---------- */
+function setupExcluded() {
+  const ex = DATA.excluded || [];
+  $("n-excluded").textContent = fmt(ex.length);
+  const render = () => {
+    const q = $("ex-q").value.trim().toLowerCase();
+    const hits = ex.filter(r => !q || r.name.toLowerCase().includes(q)).slice(0, 80);
+    $("exlist").innerHTML = hits.map(r => `<div class="exrow"><div>${esc(r.name)}</div>
+        <button data-ex="${esc(r.id)}">${S.restored[r.id] ? "↩ ยกเลิก" : "เอากลับมา"}</button>
+        <div class="msub">${esc(r.note || r.type)} · ${esc(r.amphoe)}${r.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener">Maps ↗</a>` : ""}</div></div>`).join("")
+      + (ex.length > hits.length ? `<p class="hint">แสดง ${hits.length} รายการ — พิมพ์ค้นหาเพื่อดูที่เหลือ</p>` : "");
+    $("exlist").querySelectorAll("[data-ex]").forEach(b => b.onclick = () => {
+      const id = b.dataset.ex;
+      if (S.restored[id]) delete S.restored[id]; else S.restored[id] = true;
+      save(); render();
+    });
+  };
+  $("ex-q").oninput = render;
+  render();
+}
+
+/* ---------- backup of stars / notes / hidden ---------- */
+$("btn-backup").onclick = () => download(`ตลาด_บันทึก_${new Date().toISOString().slice(0, 10)}.json`,
+  JSON.stringify({ shortlist: S.shortlist, notes: S.notes, hidden: S.hidden, restored: S.restored, presets: S.presets }, null, 1),
+  "application/json");
+$("in-backup").onchange = async e => {
+  try {
+    const d = JSON.parse(await e.target.files[0].text());
+    for (const k of ["shortlist", "notes", "hidden", "restored", "presets"]) Object.assign(S[k], d[k] || {});
+    update(); setupExcluded(); renderPresets();
+    modal(`<h3>นำเข้าแล้ว ✓</h3><div class="btnrow"><button data-close>ปิด</button></div>`);
+  } catch (err) { modal(`<h3>นำเข้าไม่ได้</h3><p class="hint">${esc(err.message)}</p><div class="btnrow"><button data-close>ปิด</button></div>`); }
 };
 
 $("btn-side").onclick = () => $("side").classList.toggle("open");
 
 /* ---------- boot ---------- */
-function renderAll() { renderPresets(); renderPillars(); renderAdvanced(); update(); }
-$("sub").textContent = `${DATA.area ? DATA.area + " · " : ""}ข้อมูล ${DATA.generated}`;
+function renderAll() { renderPresets(); renderPillars(); renderAdvanced(); renderNotice(); update(); }
+$("sub").textContent = `${DATA.area ? DATA.area + " · " : ""}` +
+  (DATA.fetched ? `ข้อมูลรีวิว ณ ${DATA.fetched[0] === DATA.fetched[1] ? DATA.fetched[0] : DATA.fetched[0] + " – " + DATA.fetched[1]}` : `สร้างเมื่อ ${DATA.generated}`);
 setupFilters();
 setupMap();
 renderAll();

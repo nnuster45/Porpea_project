@@ -2,6 +2,7 @@
 
 import re
 
+import numpy as np
 import pandas as pd
 
 from .geo import tiles
@@ -54,13 +55,15 @@ def discover(cfg, client, log=print):
 
     for keyword in disc["keywords"]:
         queue = [(rect, 0) for rect in base_tiles]
-        n_tiles = 0
+        n_tiles = capped = 0
         while queue:
             rect, depth = queue.pop()
             n_tiles += 1
             places, saturated = search_tile(client, keyword, rect)
             if saturated and depth < max_depth:
                 queue.extend((sub, depth + 1) for sub in rect.subdivide())
+            elif saturated:
+                capped += 1  # still 60 results at the smallest tile: Google may be hiding more here
 
             for place in places:
                 row = _row(place)
@@ -79,6 +82,9 @@ def discover(cfg, client, log=print):
                     row["keywords"] = {keyword}
                     found[row["place_id"]] = row
         log(f"  '{keyword}': searched {n_tiles} tiles, {len(found)} unique markets so far")
+        if capped:
+            log(f"    ! {capped} tiles still full (60 results) at max_subdivide_depth={max_depth}"
+                " — some markets may be missing there; raise area.max_subdivide_depth to search deeper")
 
     log(f"  rejected search hits (a place may be counted more than once): {skipped}")
     rows = []
@@ -93,33 +99,45 @@ def discover(cfg, client, log=print):
 
 
 def suggest_keep(df, disc):
-    """Add keep (1/0), keep_auto (the suggestion) and note.
+    """Add keep (1/0), keep_auto (the suggestion) and note — keep=1 means "this is the market itself".
 
-    keep=1 when the place looks like the market itself: a market-like Google type, or a name that
-    starts like a market. Shop branches named after a market ("7-11 สาขาตลาด…") and anything else get 0.
-    The older `suspect_primary_type` rule (blocklist) still applies when `market_types` isn't set.
+    Rules in order, first match wins (see discover.* in config.yaml):
+      1. never_market_types (lodging, parking, …)               → 0
+      2. name starts like a market (market_name_prefix)          → 1
+      3. name looks like a shop branch / residence (suspect_name) → 0
+      4. "ตลาด" in the middle of a name, after a person/product   → 0  (a stall inside a market)
+         unless the name has market words (market_name_words)
+      5. a market-like Google type (market_types)                → 1
+      otherwise                                                   → 0
     """
     names = df["name"].fillna("")
     types = df["primary_type"].fillna("")
+    keep = pd.Series(np.nan, index=df.index)
     notes = pd.Series("", index=df.index)
-    bad_name = disc.get("suspect_name")
-    if bad_name:
-        notes[names.str.contains(bad_name, case=False, regex=True)] = "name looks like a shop branch/residence"
 
-    market_types = disc.get("market_types")
-    if market_types:
-        prefix = disc.get("market_name_prefix")
-        looks_market = types.isin(market_types)
-        if prefix:
-            looks_market |= names.str.contains(prefix, case=False, regex=True)
-        miss = (notes == "") & ~looks_market
-        notes[miss] = "not a market type: " + types[miss].replace("", "(none)")
-    elif disc.get("suspect_primary_type"):
-        hit = (notes == "") & types.str.contains(disc["suspect_primary_type"], case=False, regex=True)
-        notes[hit] = "primary_type=" + types[hit]
+    def rule(mask, value, note):
+        hit = mask & keep.isna()
+        keep[hit] = value
+        notes[hit] = note if isinstance(note, str) else note[hit]
+
+    def has(pattern):
+        return names.str.contains(pattern, case=False, regex=True) if pattern else pd.Series(False, index=df.index)
+
+    never = disc.get("never_market_types") or []
+    rule(types.isin(never), 0, "not a market: " + types)
+    rule(has(disc.get("market_name_prefix")), 1, "")
+    rule(has(disc.get("suspect_name")), 0, "name looks like a shop branch/residence")
+    stall = names.str.contains("ตลาด") & ~names.str.match(r"\s*ตลาด") & ~has(disc.get("market_name_words"))
+    rule(stall, 0, "looks like a stall/shop inside a market")
+    if disc.get("market_types"):
+        rule(types.isin(disc["market_types"]), 1, "")
+        rule(pd.Series(True, index=df.index), 0, "not a market type: " + types.replace("", "(none)"))
+    elif disc.get("suspect_primary_type"):  # older blocklist-only configs
+        rule(types.str.contains(disc["suspect_primary_type"], case=False, regex=True), 0, "primary_type=" + types)
+    keep = keep.fillna(1)
 
     df = df.copy()
-    df["keep"] = (notes == "").astype(int)
+    df["keep"] = keep.astype(int)
     df["keep_auto"] = df["keep"]
     df["note"] = notes
     return df

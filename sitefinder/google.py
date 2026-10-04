@@ -8,6 +8,7 @@ SKU is decided by the field mask, so each method uses the narrowest mask it need
 
 import time
 from collections import Counter
+from datetime import datetime, timezone
 
 import requests
 
@@ -43,7 +44,7 @@ class BudgetExceeded(RuntimeError):
 
 
 class GoogleClient:
-    def __init__(self, api_key, cache, max_calls=4000, min_interval_s=0.05, session=None):
+    def __init__(self, api_key, cache, max_calls=4000, min_interval_s=0.05, session=None, ledger=None):
         if not api_key:
             raise ValueError("GOOGLE_MAPS_API_KEY is not set (put it in .env)")
         self.api_key = api_key
@@ -53,6 +54,8 @@ class GoogleClient:
         self.session = session or requests.Session()
         self.calls = Counter()  # billable (non-cached) calls per SKU
         self.cache_hits = Counter()
+        self.ledger = ledger  # monthly per-SKU free-cap guard (budget.Ledger)
+        self.last_fetched = None
         self._last_call = 0.0
 
     def _request(self, sku, method, url, field_mask=None, body=None):
@@ -60,11 +63,16 @@ class GoogleClient:
         cached = self.cache.get(sku, key)
         if cached is not None:
             self.cache_hits[sku] += 1
+            self.last_fetched = self.cache.fetched_at(sku, key)
             return cached
 
         if sum(self.calls.values()) >= self.max_calls:
             raise BudgetExceeded(
                 f"reached --max-calls={self.max_calls}; re-run to continue (finished calls are cached)"
+            )
+        if self.ledger is not None and not self.ledger.allow(sku):
+            raise BudgetExceeded(
+                f"monthly cap for {sku} reached ({self.ledger.used(sku)} used); continues next month"
             )
 
         headers = {"X-Goog-Api-Key": self.api_key, "Content-Type": "application/json"}
@@ -83,6 +91,8 @@ class GoogleClient:
             break
 
         self.calls[sku] += 1
+        if self.ledger is not None:
+            self.ledger.record(sku)
         if resp.status_code != 200:
             try:
                 message = resp.json().get("error", {}).get("message", resp.text)
@@ -92,6 +102,7 @@ class GoogleClient:
 
         data = resp.json()
         self.cache.set(sku, key, data)
+        self.last_fetched = datetime.now(timezone.utc)
         return data
 
     def text_search(self, query, rect, page_token=None):
