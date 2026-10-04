@@ -54,6 +54,7 @@ jobs:
         run: pip install -r requirements.txt -c constraints.txt
 
       # data/ ไม่อยู่ใน repo (ข้อมูลจาก Google) — เก็บข้ามรอบใน Actions cache ของ repo นี้
+      # อย่าแก้รายการ path: เปลี่ยนแล้ว cache เดิมจะหาไม่เจอ (ไฟล์ใหม่ให้ใส่ใน data/cache/)
       # (cache ที่ไม่ถูกใช้ 7 วันจะถูกลบ ถ้าหายต้องรัน discover ใหม่)
       - name: Restore data from previous runs
         uses: actions/cache/restore@v4
@@ -63,7 +64,6 @@ jobs:
             data/markets.csv
             data/market_details.csv
             data/surroundings.csv
-            data/surroundings_items.json
           key: sitefinder-data-${{ github.run_id }}
           restore-keys: sitefinder-data-
 
@@ -153,7 +153,6 @@ jobs:
             data/markets.csv
             data/market_details.csv
             data/surroundings.csv
-            data/surroundings_items.json
           key: sitefinder-data-${{ github.run_id }}
 
       - name: Upload results (download from the run page)

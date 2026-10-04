@@ -20,7 +20,9 @@ MAP = DATA / "map.html"
 DASHBOARD = DATA / "dashboard.html"
 CACHE = DATA / "cache"
 REVIEW = Path("review") / "keep.csv"  # committed overrides: place_id, keep, note
-SURROUND_ITEMS = DATA / "surroundings_items.json"  # what each OSM / file count is made of (dashboard lists)
+# what each OSM / file count is made of (dashboard lists); under cache/ so GitHub Actions keeps it
+# (adding a path to the workflow's cache list would change the cache version and lose the old cache)
+SURROUND_ITEMS = CACHE / "surroundings_items.json"
 OSM_LOCAL = DATA / "osm" / "features.json"  # from `osm-extract`; used instead of Overpass when present
 
 
@@ -237,6 +239,7 @@ def cmd_surround(cfg, args):
     df.to_csv(SURROUND, index=False, encoding="utf-8-sig")
     print(f"→ {SURROUND} ({len(df.columns) - 1} features)")
     items = surround_items(cfg, markets, overpass)
+    SURROUND_ITEMS.parent.mkdir(parents=True, exist_ok=True)
     SURROUND_ITEMS.write_text(json.dumps(items, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"→ {SURROUND_ITEMS} (what each OSM / file count is made of)")
 
