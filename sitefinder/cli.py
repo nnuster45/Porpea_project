@@ -17,6 +17,7 @@ DETAILS = DATA / "market_details.csv"
 SURROUND = DATA / "surroundings.csv"
 RANKED = DATA / "ranked.csv"
 MAP = DATA / "map.html"
+DASHBOARD = DATA / "dashboard.html"
 CACHE = DATA / "cache"
 
 
@@ -178,8 +179,22 @@ def cmd_map(cfg, args):
     print(f"→ {MAP} (open in a browser)")
 
 
+def cmd_dashboard(cfg, args):
+    from .dashboard import build_payload, render
+    from .score import build_features
+
+    df = build_features(
+        load_markets(),
+        need(DETAILS, "enrich"),
+        need(SURROUND, "surround"),
+        cfg["scoring"].get("rating_prior_reviews", 30),
+    )
+    DASHBOARD.write_text(render(build_payload(df, cfg)), encoding="utf-8")
+    print(f"→ {DASHBOARD} ({len(df)} markets) — double-click to open; weights/filters update live")
+
+
 def cmd_all(cfg, args):
-    for fn in (cmd_discover, cmd_enrich, cmd_surround, cmd_score, cmd_map):
+    for fn in (cmd_discover, cmd_enrich, cmd_surround, cmd_score, cmd_map, cmd_dashboard):
         print(f"\n== {fn.__name__[4:]} ==")
         fn(cfg, args)
 
@@ -191,7 +206,8 @@ COMMANDS = {
     "surround": (cmd_surround, "3. count POIs around each market → data/surroundings.csv"),
     "score": (cmd_score, "4. rank markets for a persona → data/ranked.csv"),
     "map": (cmd_map, "5. interactive map → data/map.html"),
-    "all": (cmd_all, "run stages 1–5"),
+    "dashboard": (cmd_dashboard, "6. dashboard: tune weights/filters live → data/dashboard.html"),
+    "all": (cmd_all, "run stages 1–6"),
 }
 
 

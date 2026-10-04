@@ -13,7 +13,9 @@ def build_features(markets, details, surroundings, rating_prior_reviews=30):
     df["reviews_log"] = np.log1p(n)
     # Bayesian average: a 5.0 from 3 reviews should not beat a 4.4 from 2,000
     mean = df["rating"].mean() if df["rating"].notna().any() else 0
-    df["rating_adj"] = (rating_prior_reviews * mean + n * df["rating"].fillna(mean)) / (rating_prior_reviews + n)
+    adj = (rating_prior_reviews * mean + n * df["rating"].fillna(mean)) / (rating_prior_reviews + n)
+    # rounded so float noise can't break ties differently here and in the dashboard's JS
+    df["rating_adj"] = adj.round(6)
     return df.reset_index(drop=True)
 
 

@@ -5,11 +5,26 @@ Pipeline ดึงรายชื่อตลาดทุกแบบ (ตลา
 + **เวลาเปิดที่ตรงกับลูกค้า** เพื่อกรอง candidate ก่อนลงไปดูหน้างานจริง
 
 ```
-discover ──► enrich ──► surround ──► score ──► map
-หาตลาด       รีวิว/เรตติ้ง   นับ POI รอบตลาด   จัดอันดับ    แผนที่ HTML
-(Text Search) /เวลาเปิด    (Aggregate/OSM/   ตาม persona
-              (Details)     ไฟล์ 7-11)
+discover ──► enrich ──► surround ──► dashboard
+หาตลาด       รีวิว/เรตติ้ง   นับ POI รอบตลาด   ปรับน้ำหนัก/กรอง/ดูแผนที่ แบบ live
+(Text Search) /เวลาเปิด    (Aggregate/OSM/   (score / map = เวอร์ชัน CSV/แผนที่อย่างเดียว)
+              (Details)     ไฟล์ 7-11/นิคมฯ)
 ```
+
+## Dashboard (หน้าหลักที่ใช้ดูผล)
+
+`python -m sitefinder dashboard` → ดับเบิลคลิกเปิด `data/dashboard.html` (ไฟล์เดียว ไม่ต้องรัน server)
+
+- **① เลือกกลุ่มลูกค้า** (คนงานโรงงาน / นักศึกษา / ออฟฟิศ / นักท่องเที่ยว / ทั่วไป หรือกลุ่มที่บันทึกเอง)
+- **② ปรับน้ำหนัก** ตัววัดแต่ละตัวด้วย slider — คะแนน อันดับ สีหมุดบนแผนที่ เปลี่ยนทันที
+- **③ กรอง** ตามประเภทตลาด, อำเภอ, รีวิวขั้นต่ำ, ช่วงเวลาที่เปิด, เฉพาะที่ติดดาว
+- คลิกตลาด → แผงรายละเอียด: **คะแนนมาจากไหน** (ได้กี่คะแนนจากแต่ละตัววัด), ค่าจริงทุกตัว เทียบกับตลาดอื่น,
+  เวลาเปิด, ลิงก์ Google Maps, **ติดดาว ★** และ **บันทึกตอนลงพื้นที่**
+- **⬇ CSV** ดาวน์โหลดรายการที่กรองอยู่ (รวมดาวและบันทึก) เปิดใน Excel ได้
+- **บันทึกเป็นกลุ่มใหม่** / **ส่งออกไป config** — เอาน้ำหนักที่ปรับแล้วไปใส่ `config.yaml` ให้คำสั่ง `score` ใช้ชุดเดียวกัน
+- ดาว บันทึก และน้ำหนักที่ปรับ เก็บในเบราว์เซอร์ที่เปิด (เปิดเครื่อง/เบราว์เซอร์อื่นจะไม่เห็น — ใช้ CSV แทน)
+- ต้องต่อเน็ตเพื่อโหลดแผนที่และฟอนต์ — ถ้าออฟไลน์ ตารางและคะแนนยังใช้ได้
+- รัน `dashboard` ใหม่หลังดึงข้อมูลใหม่ (discover / enrich / surround) — ดาวและบันทึกเดิมยังอยู่
 
 ## สิ่งที่ต้องเตรียม (checklist)
 
@@ -54,7 +69,8 @@ python -m sitefinder estimate # ดูจำนวน call ก่อนใช้
 | `python -m sitefinder enrich` | ดึงเรตติ้ง, จำนวนรีวิว, เวลาเปิด → แปลงเป็น `open_morning/evening/night`, `days_open` | `data/market_details.csv` |
 | `python -m sitefinder surround` | นับ POI รอบตลาด (Google + OSM), ขนาดพื้นที่อุตสาหกรรม, จำนวนคนงานนิคมฯ, 7-11 | `data/surroundings.csv` |
 | `python -m sitefinder score --persona factory_worker` | จัดอันดับตาม persona | `data/ranked.csv` |
-| `python -m sitefinder map` | แผนที่ interactive (คลิกหมุดดูคะแนน/เหตุผล/ลิงก์ Google Maps) | `data/map.html` |
+| `python -m sitefinder map` | แผนที่อย่างเดียว (คลิกหมุดดูคะแนน/เหตุผล/ลิงก์ Google Maps) | `data/map.html` |
+| `python -m sitefinder dashboard` | **dashboard ปรับน้ำหนัก/กรอง/ติดดาว/จดบันทึก แบบ live** | `data/dashboard.html` |
 | `python -m sitefinder all` | รันทั้งหมดต่อกัน | |
 
 - ทุก response จาก API ถูก cache ใน `data/cache/` — รันซ้ำไม่เสีย quota ซ้ำ
