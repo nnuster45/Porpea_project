@@ -294,36 +294,58 @@ def test_client_raises_api_error_message(tmp_path):
 from sitefinder.discover import carry_over_keep, suggest_keep  # noqa: E402
 
 DISC = {
-    "suspect_primary_type": "restaurant|cafe|lodging|real_estate",
-    "suspect_name": "^ร้าน|คอนโด",
+    "suspect_name": "สาขา|^ร้าน|คอนโด",
+    "market_types": ["market", "flea_market", "farmers_market", "food_court"],
+    "market_name_prefix": "^(?:ตลาด|walking street)",
 }
 
 
 def _found():
     return pd.DataFrame({
-        "place_id": ["a", "b", "c", "d", "e"],
-        "name": ["ตลาดนัดวัดใหม่", "ร้านส้มตำ ตลาดเก่า", "คอนโด ตลาดบางแสน", "ตลาดคาเฟ่", "ตลาดหนองมน"],
-        "primary_type": ["buddhist_temple", "thai_restaurant", "apartment_building", "cafe", "market"],
+        "place_id": ["a", "b", "c", "d", "e", "f", "g"],
+        "name": ["ตลาดนัดวัดใหม่", "7-11 สาขาตลาดนัดมณีแก้ว", "คอนโด ตลาดบางแสน", "Aqua Scape Market",
+                 "ตลาดวินวิน", "ก๋วยจั๊บอุบล(ตลาดต้นตาล)", "Walking Street Pattaya"],
+        "primary_type": ["buddhist_temple", "convenience_store", "market", "market",
+                         "noodle_shop", "food", "tourist_attraction"],
     })
 
 
-def test_suggest_keep_flags_shops_but_not_temple_markets():
+def test_suggest_keep_market_types_and_names():
     df = suggest_keep(_found(), DISC).set_index("place_id")
-    assert df["keep"].to_dict() == {"a": 1, "b": 0, "c": 0, "d": 0, "e": 1}
-    assert df.loc["b", "note"] == "primary_type=thai_restaurant"
-    assert "shop" in df.loc["c", "note"]
+    assert df["keep"].to_dict() == {
+        "a": 1,  # name starts with ตลาด although typed as a temple
+        "b": 0,  # shop branch named after a market
+        "c": 0,  # residence
+        "d": 1,  # market type
+        "e": 1,  # mis-typed market, name starts with ตลาด
+        "f": 0,  # shop that mentions a market in its name
+        "g": 1,  # walking street
+    }
+    assert "branch" in df.loc["b", "note"]
+    assert df.loc["f", "note"] == "not a market type: food"
+    assert (df["keep_auto"] == df["keep"]).all()
 
 
-def test_rerun_discover_keeps_manual_edits():
+def test_rerun_discover_keeps_manual_edits_only():
     old = suggest_keep(_found(), DISC)
-    old.loc[old["place_id"] == "d", "keep"] = 1          # user: the café one is a real market
-    old.loc[old["place_id"] == "e", ["keep", "note"]] = [0, "ไปดูแล้ว เงียบ"]
+    old.loc[old["place_id"] == "f", ["keep", "note"]] = [1, "เป็นตลาดจริง"]      # user: keep it
+    old.loc[old["place_id"] == "e", ["keep", "note"]] = [0, "ไปดูแล้ว เงียบ"]     # user: drop it
+    # a rule change since the last run: "d" is no longer suggested
+    disc2 = {**DISC, "market_types": ["flea_market"]}
     new = suggest_keep(pd.concat([_found(), pd.DataFrame(
-        {"place_id": ["f"], "name": ["ตลาดใหม่"], "primary_type": ["market"]})]), DISC)
+        {"place_id": ["h"], "name": ["ตลาดใหม่"], "primary_type": ["market"]})]), disc2)
     merged = carry_over_keep(new, old).set_index("place_id")
-    assert merged.loc["d", "keep"] == 1
+    assert merged.loc["f", "keep"] == 1 and merged.loc["f", "note"] == "เป็นตลาดจริง"
     assert merged.loc["e", "keep"] == 0 and merged.loc["e", "note"] == "ไปดูแล้ว เงียบ"
-    assert merged.loc["f", "is_new"] == 1 and merged.loc["a", "is_new"] == 0
+    assert merged.loc["d", "keep"] == 0  # unedited → follows the new rules, not the old suggestion
+    assert merged.loc["h", "is_new"] == 1 and merged.loc["a", "is_new"] == 0
+
+
+def test_carry_over_ignores_files_without_keep_auto():
+    old = suggest_keep(_found(), DISC).drop(columns=["keep_auto"])
+    old["keep"] = 1  # e.g. suggestions from an older version of the rules
+    merged = carry_over_keep(suggest_keep(_found(), DISC), old).set_index("place_id")
+    assert merged.loc["b", "keep"] == 0
 
 
 def test_cli_stages_only_use_keep_rows(tmp_path, monkeypatch, capsys):

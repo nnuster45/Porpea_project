@@ -29,10 +29,14 @@ discover:
   # ตัดผลที่ชื่อไม่ใช่ตลาดจริง (เช่น "ตลาดหุ้น", ร้านในตลาด) — regex, ไม่สนตัวพิมพ์
   name_must_match: "ตลาด|market|walking street|ถนนคนเดิน|บาซาร์|bazaar|plaza|พลาซ่า"
   name_exclude: "ตลาดหลักทรัพย์|ประกันภัย|อสังหา|ธนาคาร"
-  # ผลที่เข้าข่ายด้านล่างจะได้ keep=0 ใน markets.csv (แค่แนะนำ — แก้เป็น 1 ได้)
-  # ไม่ใส่ temple/place_of_worship เพราะตลาดนัดในวัดมีเยอะ
-  suspect_primary_type: "restaurant|cafe|coffee|bakery|^bar$|lodging|hotel|real_estate|bank|atm|insurance|^car_|corporate_office|school|university|hospital|doctor|clinic|dentist|beauty|hair|spa|gym|parking|gas_station"
-  suspect_name: "^ร้าน|^บริษัท|^หจก|คอนโด|condo|หมู่บ้าน|อพาร์ท|apartment"
+  # คัดว่าอะไรคือ "ตัวตลาด" (keep=1) — ที่เหลือ keep=0 (แค่แนะนำ แก้ได้ใน review/keep.csv)
+  # จากผลจริงในชลบุรี: ร้านที่ตั้งชื่อตามตลาด ("7-11 สาขาตลาด…", "CJ สาขาตลาด…") ปนมาเยอะมาก
+  # 1) ชื่อมีคำเหล่านี้ → keep=0 (ร้านสาขา / ที่อยู่อาศัย)
+  suspect_name: "สาขา|branch|^ร้าน|^บริษัท|^หจก|คอนโด|condo|หมู่บ้าน|อพาร์ท|apartment"
+  # 2) ประเภทของ Google ที่เป็นตลาด → keep=1
+  market_types: [market, flea_market, farmers_market, food_court]
+  # 3) ประเภทอื่น แต่ชื่อขึ้นต้นแบบตลาด → keep=1 (Google จัดประเภทตลาดไทยผิดบ่อย)
+  market_name_prefix: "^(?:ตลาด|ถนนคนเดิน|walking street|night market|ไนท์มาร์เก็ต|ไนท์ บาซาร์)"
 
 surroundings:
   # source: google_aggregate (Places Aggregate API) หรือ osm (Overpass, ฟรี)
@@ -41,14 +45,15 @@ surroundings:
   # ชื่อ feature -> place types ของ Google (นับรวมกัน)
   # https://developers.google.com/maps/documentation/places/web-service/place-types
   # เขียนเป็น list (ใช้ radii_m ด้านบน) หรือ {types: [...], radii_m: [...]} เพื่อกำหนดรัศมีเฉพาะตัว
-  # call = จำนวนตลาด (keep=1) × รวมจำนวนรัศมีทุก feature (ตอนนี้ 12) — ฟรี 5,000 call/เดือน ≈ 416 ตลาด
   # school/hospital/transit/โรงงาน ดึงจาก OSM (ฟรี) ด้านล่างแทน
+  # ดึงเฉพาะรัศมีที่ใช้ใน scoring.pillars (call ละ $0 ใน free cap แต่จำกัด 5,000/เดือน)
+  # → 7 call ต่อตลาด ≈ ฟรีถึง ~700 ตลาด
   google_types:
-    conv_store: [convenience_store]
-    supermarket: [supermarket, grocery_store]
-    mall: [shopping_mall, department_store]
-    university: [university]
-    apartment: [apartment_building, apartment_complex]
+    conv_store: {types: [convenience_store], radii_m: [500]}
+    supermarket: {types: [supermarket, grocery_store], radii_m: [1500]}
+    mall: {types: [shopping_mall, department_store], radii_m: [1500]}
+    university: {types: [university], radii_m: [1500]}
+    apartment: {types: [apartment_building, apartment_complex], radii_m: [1500]}
     lodging: {types: [lodging], radii_m: [1500]}
     # ที่ทำงาน (ออฟฟิศ + หน่วยราชการ) — 500 ม. = ระยะเดินช่วงพักเที่ยง
     workplace:

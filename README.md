@@ -178,7 +178,7 @@ CSV ต้องมีคอลัมน์ `lat`, `lng` — ดูตัวอ�
   |---|---|---|---|
   | discover | Text Search Pro | 5,000 | tiles × keywords × ≤3 หน้า |
   | enrich | Place Details Enterprise | 1,000 | 1 ต่อตลาด (keep=1) |
-  | surround | Places Aggregate (Pro) | 5,000 | ตลาด × 12 (รวมรัศมีทุก feature) → ฟรีถึง ~416 ตลาด |
+  | surround | Places Aggregate (Pro) | 5,000 | ตลาด × 7 (รวมรัศมีทุก feature ใน `google_types`) → ฟรีถึง ~714 ตลาด |
 
   ส่วนเกินของ Aggregate คิด $10/1,000 call — ลด feature หรือรัศมีใน `google_types` ได้ถ้าตลาดเยอะ
   (school/hospital/transit/โรงงาน ดึงจาก OSM ฟรี ไม่กิน quota Google)

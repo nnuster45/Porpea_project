@@ -93,33 +93,59 @@ def discover(cfg, client, log=print):
 
 
 def suggest_keep(df, disc):
-    """Add keep (1/0) and note columns: 0 = looks like a shop/office rather than a market."""
-    bad_type = disc.get("suspect_primary_type")
-    bad_name = disc.get("suspect_name")
+    """Add keep (1/0), keep_auto (the suggestion) and note.
+
+    keep=1 when the place looks like the market itself: a market-like Google type, or a name that
+    starts like a market. Shop branches named after a market ("7-11 สาขาตลาด…") and anything else get 0.
+    The older `suspect_primary_type` rule (blocklist) still applies when `market_types` isn't set.
+    """
+    names = df["name"].fillna("")
+    types = df["primary_type"].fillna("")
     notes = pd.Series("", index=df.index)
-    if bad_type:
-        hit = df["primary_type"].fillna("").str.contains(bad_type, case=False, regex=True)
-        notes[hit] = "primary_type=" + df.loc[hit, "primary_type"]
+    bad_name = disc.get("suspect_name")
     if bad_name:
-        hit = df["name"].fillna("").str.contains(bad_name, case=False, regex=True) & (notes == "")
-        notes[hit] = "name looks like a shop/residence"
+        notes[names.str.contains(bad_name, case=False, regex=True)] = "name looks like a shop branch/residence"
+
+    market_types = disc.get("market_types")
+    if market_types:
+        prefix = disc.get("market_name_prefix")
+        looks_market = types.isin(market_types)
+        if prefix:
+            looks_market |= names.str.contains(prefix, case=False, regex=True)
+        miss = (notes == "") & ~looks_market
+        notes[miss] = "not a market type: " + types[miss].replace("", "(none)")
+    elif disc.get("suspect_primary_type"):
+        hit = (notes == "") & types.str.contains(disc["suspect_primary_type"], case=False, regex=True)
+        notes[hit] = "primary_type=" + types[hit]
+
     df = df.copy()
     df["keep"] = (notes == "").astype(int)
+    df["keep_auto"] = df["keep"]
     df["note"] = notes
     return df
 
 
 def carry_over_keep(new, old):
-    """Keep the user's manual keep/note edits from a previous markets.csv for places found again."""
-    if old is None or "keep" not in old.columns:
+    """Keep manual keep/note edits from a previous markets.csv for places found again.
+
+    Only rows where the user changed `keep` away from the suggestion (`keep_auto`) are carried over,
+    so improving the suggestion rules takes effect on re-runs. Files without `keep_auto` predate
+    that column and hold only suggestions, so nothing is carried from them.
+    """
+    new = new.copy()
+    if old is None or "place_id" not in old.columns:
+        new["is_new"] = 1
         return new
     prev = old.drop_duplicates("place_id").set_index("place_id")
-    known = new["place_id"].isin(prev.index)
-    new = new.copy()
-    new.loc[known, "keep"] = new.loc[known, "place_id"].map(pd.to_numeric(prev["keep"], errors="coerce")).fillna(1).astype(int).values
+    new["is_new"] = (~new["place_id"].isin(prev.index)).astype(int)
+    if "keep" not in prev.columns or "keep_auto" not in prev.columns:
+        return new
+    prev_keep = pd.to_numeric(prev["keep"], errors="coerce")
+    edited = prev.index[(prev_keep != pd.to_numeric(prev["keep_auto"], errors="coerce")) & prev_keep.notna()]
+    hit = new["place_id"].isin(edited)
+    new.loc[hit, "keep"] = new.loc[hit, "place_id"].map(prev_keep).astype(int).values
     if "note" in prev.columns:
-        new.loc[known, "note"] = new.loc[known, "place_id"].map(prev["note"]).fillna("").values
-    new["is_new"] = (~known).astype(int)
+        new.loc[hit, "note"] = new.loc[hit, "place_id"].map(prev["note"]).fillna("").values
     return new
 
 
