@@ -85,6 +85,11 @@ jobs:
         if: ${{ inputs.stages != 'dashboard' }}
         run: python -m sitefinder estimate
 
+      # สรุปรายชื่อตามประเภท → ดูในหน้า Summary ของ run ไว้ตัดสินใจว่าจะตัดอะไรออก
+      - name: Review markets
+        if: ${{ inputs.stages == 'all' || inputs.stages == 'discover' }}
+        run: python -m sitefinder review
+
       - name: 2. Enrich (reviews, rating, hours)
         if: ${{ inputs.stages == 'all' || inputs.stages == 'refresh' }}
         run: python -m sitefinder enrich --max-calls "$MAX_CALLS"

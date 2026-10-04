@@ -127,6 +127,45 @@ def cmd_discover(cfg, args):
     print("  then run `estimate` and `enrich`.")
 
 
+def review_report(df, samples=4):
+    """Markdown summary of markets.csv: what was kept/dropped, by primary type and keyword."""
+    from .discover import apply_review
+
+    df = apply_review(df, REVIEW)
+    keep = pd.to_numeric(df.get("keep", 1), errors="coerce").fillna(1) != 0
+    kept, dropped = df[keep], df[~keep]
+    lines = [f"## markets.csv: {len(df)} places — keep=1: {len(kept)}, keep=0: {len(dropped)}", ""]
+
+    def table(sub, title):
+        lines.extend([f"### {title}", "", "| primary_type | n | examples |", "|---|---:|---|"])
+        counts = sub["primary_type"].fillna("(none)").value_counts()
+        for t, n in counts.items():
+            names = sub.loc[sub["primary_type"].fillna("(none)") == t, "name"].head(samples).tolist()
+            lines.append(f"| {t} | {n} | {' · '.join(str(x) for x in names)} |")
+        lines.append("")
+
+    table(kept, "keep=1 by primary_type")
+    if "keywords" in kept:
+        only = kept["keywords"].fillna("").str.split("|").map(len) == 1
+        by_kw = kept.loc[only, "keywords"].value_counts()
+        lines.extend(["### keep=1 found by a single keyword only", "", "| keyword | n |", "|---|---:|"])
+        lines.extend(f"| {k} | {n} |" for k, n in by_kw.items())
+        lines.append("")
+    if "note" in dropped:
+        lines.extend(["### keep=0 reasons", "", "| note | n |", "|---|---:|"])
+        lines.extend(f"| {k} | {n} |" for k, n in dropped["note"].fillna("").value_counts().head(20).items())
+    return "\n".join(lines)
+
+
+def cmd_review(cfg, args):
+    report = review_report(need(MARKETS, "discover"))
+    print(report)
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as f:
+            f.write(report + "\n")
+
+
 def cmd_enrich(cfg, args):
     from .enrich import enrich
 
@@ -201,6 +240,7 @@ def cmd_all(cfg, args):
 
 COMMANDS = {
     "estimate": (cmd_estimate, "estimate API calls before spending quota"),
+    "review": (cmd_review, "summarise data/markets.csv by type/keyword to decide what to drop"),
     "discover": (cmd_discover, "1. find markets (Text Search) → data/markets.csv"),
     "enrich": (cmd_enrich, "2. reviews / rating / opening hours → data/market_details.csv"),
     "surround": (cmd_surround, "3. count POIs around each market → data/surroundings.csv"),
