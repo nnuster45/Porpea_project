@@ -19,6 +19,7 @@ RANKED = DATA / "ranked.csv"
 MAP = DATA / "map.html"
 DASHBOARD = DATA / "dashboard.html"
 CACHE = DATA / "cache"
+REVIEW = Path("review") / "keep.csv"  # committed overrides: place_id, keep, note
 
 
 def load_env(path=".env"):
@@ -59,8 +60,10 @@ def need(path, stage):
 
 
 def load_markets():
-    """Markets the user kept (keep != 0). Missing keep column = keep everything."""
-    df = need(MARKETS, "discover")
+    """Markets the user kept (keep != 0, after review/keep.csv). Missing keep column = keep everything."""
+    from .discover import apply_review
+
+    df = apply_review(need(MARKETS, "discover"), REVIEW)
     if "keep" in df.columns:
         df = df[pd.to_numeric(df["keep"], errors="coerce").fillna(1) != 0]
     return df.reset_index(drop=True)
@@ -112,15 +115,16 @@ def cmd_discover(cfg, args):
         df = discover(cfg, client)
     finally:
         print(client.usage_report())
-    from .discover import carry_over_keep
+    from .discover import apply_review, carry_over_keep
 
     MARKETS.parent.mkdir(parents=True, exist_ok=True)
     old = pd.read_csv(MARKETS) if MARKETS.exists() else None
-    df = carry_over_keep(df, old)
+    df = apply_review(carry_over_keep(df, old), REVIEW)
     df.to_csv(MARKETS, index=False, encoding="utf-8-sig")
     kept = int((df["keep"] == 1).sum())
     print(f"→ {MARKETS}: {len(df)} places, {kept} keep=1, {len(df) - kept} keep=0 (suggested, see `note`)")
-    print("  Open it, set keep=0 on anything that is not a real market, then run `estimate` and `enrich`.")
+    print(f"  Set keep=0 on anything that is not a real market (in {MARKETS}, or in {REVIEW} for cloud runs),")
+    print("  then run `estimate` and `enrich`.")
 
 
 def cmd_enrich(cfg, args):

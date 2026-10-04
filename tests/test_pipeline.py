@@ -448,3 +448,30 @@ def test_pillars_stop_double_counting(markets):
     ranked = score(df, pillars, log=lambda *_: None).set_index("place_id")
     # p_1 is best on reviews, p_5 best on stores: equal pillar weights → a tie, not 3:1 for stores
     assert ranked.loc["p_1", "score"] == ranked.loc["p_5", "score"]
+
+
+# ---------- review/keep.csv ----------
+
+from sitefinder.discover import apply_review  # noqa: E402
+
+
+def test_review_file_overrides_markets_csv(tmp_path):
+    markets = pd.DataFrame({"place_id": ["a", "b", "c"], "keep": [1, 0, 1], "note": ["", "auto", ""]})
+    review = tmp_path / "keep.csv"
+    # written by the dashboard: BOM + header, a Thai note with a comma
+    review.write_text('﻿place_id,keep,note\na,0,"ร้านในตลาด, ไม่ใช่ตลาด"\nb,1,\nzzz,0,not in list\n', encoding="utf-8")
+    out = apply_review(markets, review).set_index("place_id")
+    assert out["keep"].to_dict() == {"a": 0, "b": 1, "c": 1}
+    assert out.loc["a", "note"] == "ร้านในตลาด, ไม่ใช่ตลาด"
+    assert out.loc["b", "note"] == "auto"  # empty note in review keeps the old one
+    assert apply_review(markets, tmp_path / "missing.csv") is markets
+
+
+def test_load_markets_applies_review(tmp_path, monkeypatch):
+    from sitefinder import cli
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data").mkdir()
+    (tmp_path / "review").mkdir()
+    pd.DataFrame({"place_id": ["a", "b"], "keep": [1, 1]}).to_csv("data/markets.csv", index=False)
+    (tmp_path / "review" / "keep.csv").write_text("place_id,keep\nb,0\n", encoding="utf-8")
+    assert cli.load_markets()["place_id"].tolist() == ["a"]

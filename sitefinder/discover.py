@@ -121,3 +121,31 @@ def carry_over_keep(new, old):
         new.loc[known, "note"] = new.loc[known, "place_id"].map(prev["note"]).fillna("").values
     new["is_new"] = (~known).astype(int)
     return new
+
+
+def apply_review(df, path):
+    """Apply review/keep.csv (place_id, keep[, note]) on top of markets.csv.
+
+    The file is meant to be committed: it holds only Google place IDs (which may be stored
+    indefinitely) plus your own notes, so cloud runs know which places are not real markets.
+    """
+    from pathlib import Path
+
+    path = Path(path)
+    if not path.exists() or df.empty:
+        return df
+    review = pd.read_csv(path, dtype=str, encoding="utf-8-sig").dropna(subset=["place_id"])
+    review = review.drop_duplicates("place_id", keep="last").set_index("place_id")
+    df = df.copy()
+    if "keep" not in df.columns:
+        df["keep"] = 1
+    hit = df["place_id"].isin(review.index)
+    if "keep" in review.columns:
+        keep = df.loc[hit, "place_id"].map(pd.to_numeric(review["keep"], errors="coerce"))
+        df.loc[hit, "keep"] = keep.fillna(df.loc[hit, "keep"]).astype(int).values
+    if "note" in review.columns:
+        if "note" not in df.columns:
+            df["note"] = ""
+        note = df.loc[hit, "place_id"].map(review["note"])
+        df.loc[hit, "note"] = note.fillna(df.loc[hit, "note"]).values
+    return df

@@ -27,6 +27,48 @@ discover ──► enrich ──► surround ──► dashboard
 - ต้องต่อเน็ตเพื่อโหลดแผนที่และฟอนต์ — ถ้าออฟไลน์ ตารางและคะแนนยังใช้ได้
 - รัน `dashboard` ใหม่หลังดึงข้อมูลใหม่ (discover / enrich / surround) — ดาวและบันทึกเดิมยังอยู่
 
+## รันบน GitHub Actions + Cloudflare Pages
+
+ไม่ต้องรันบนเครื่อง: GitHub รัน pipeline (ใช้ API key จาก GitHub Secrets) แล้ว deploy dashboard ขึ้น Cloudflare Pages
+**Cloudflare ไม่ต้องรู้ API key ของ Google** — dashboard เป็นไฟล์ HTML ที่มีข้อมูลฝังอยู่แล้ว ไม่เรียก Google เลย
+
+### ตั้งค่าครั้งเดียว
+
+1. **Merge branch นี้เข้า branch หลัก** (main) — ปุ่ม Run workflow จะขึ้นก็ต่อเมื่อไฟล์ workflow อยู่ใน branch หลัก
+2. **Cloudflare**
+   - Account ID: หน้า Workers & Pages (แถบขวา) หรือ URL ของ dashboard
+   - API token: My Profile → API Tokens → Create Token → Custom → สิทธิ์ **Account · Cloudflare Pages · Edit**
+3. **GitHub** → repo → Settings → Secrets and variables → Actions
+   - Secrets: `GOOGLE_MAPS_API_KEY`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+   - Variables (ไม่บังคับ): `CLOUDFLARE_PAGES_PROJECT` = ชื่อโปรเจกต์ Pages (ตั้งต้น `porpea-markets` — สร้างให้อัตโนมัติ)
+4. **Google key**: จำกัดให้ใช้ได้แค่ Places API (New) + Places Aggregate API และตั้ง quota cap รายวัน
+   (จำกัดด้วย IP ไม่ได้ เพราะเครื่องของ GitHub เปลี่ยน IP ทุกครั้ง)
+5. **ล็อกหน้า dashboard**: Cloudflare Zero Trust → Access → Applications → Add (Self-hosted)
+   ใส่โดเมน `<project>.pages.dev` แล้วตั้ง policy ให้เข้าได้เฉพาะอีเมลของคุณ (ฟรีถึง 50 คน)
+   — ข้อมูลจาก Google ไม่ควรเปิดสาธารณะ (workflow ใส่ `noindex` ให้แล้ว แต่ไม่ได้กันคนที่มีลิงก์)
+6. ไฟล์ที่คุณเตรียมเอง (`data/external/industrial_estates.csv`, `7eleven.csv`) — commit เข้า repo ได้เลย
+
+### ใช้งาน: Actions → Market pipeline → Run workflow
+
+| stages | ทำอะไร | เรียก Google |
+|---|---|---|
+| `discover` | หาตลาด → โหลด `markets.csv` จาก artifact ของ run ไปตรวจ | Text Search |
+| `refresh` | enrich → surround → dashboard → deploy (ใช้รายชื่อตลาดเดิม) | Details + Aggregate |
+| `all` | ทั้งหมดต่อกัน | ทั้งหมด |
+| `dashboard` | สร้าง dashboard ใหม่จากข้อมูลเดิม → deploy (เช่น หลังแก้ `review/keep.csv` หรือ config) | ไม่เรียก |
+
+ลำดับที่แนะนำ:
+1. รัน `discover` → เปิด artifact **results** → ดู `markets.csv` → ใส่ `place_id` ที่ไม่ใช่ตลาดใน [`review/keep.csv`](review/README.md) → commit
+2. ดู step **Estimate quota** ใน log ของ run นั้นว่าอยู่ใน free cap → รัน `refresh` → เปิด `https://<project>.pages.dev`
+3. ใช้ dashboard ไปเรื่อย ๆ เจอที่ไม่ใช่ตลาดกด **🚫 ไม่ใช่ตลาด** → **⬇ keep.csv** → แทนที่ `review/keep.csv` → commit → รัน `dashboard`
+
+ข้อควรรู้
+- ผลจาก API เก็บใน **Actions cache** ของ repo — รันซ้ำไม่เสีย quota ซ้ำ (`use_cache` = true)
+  อยากได้ข้อมูลใหม่จริง ๆ (เช่น ทุก 2–3 เดือน) ให้ปิด `use_cache` — จะเสีย quota ตามจริง
+- cache ที่ไม่ถูกใช้ **7 วัน** GitHub จะลบทิ้ง → ต้องรัน `discover`/`all` ใหม่ (ค่า keep ใน `review/keep.csv` ยังอยู่)
+- ชน `max_calls` กลางทาง? รันซ้ำได้ — ทำต่อจากที่ค้าง (บันทึก cache แม้ run ล้ม)
+- ดาว/บันทึก/น้ำหนักใน dashboard เก็บในเบราว์เซอร์ — deploy ใหม่ไม่หาย (ถ้าโดเมนเดิม)
+
 ## สิ่งที่ต้องเตรียม (checklist)
 
 **จำเป็น**
@@ -78,6 +120,7 @@ python -m sitefinder estimate # ดูจำนวน call ก่อนใช้
 - `--max-calls N` (default 4900) หยุดเมื่อ call ที่ไม่ได้มาจาก cache ครบ N ครั้งในการรันนั้น; รันใหม่จะทำต่อจากที่ค้างเพราะของเดิมอยู่ใน cache
 - รัน `discover` ซ้ำได้ — ค่า `keep`/`note` ที่คุณแก้ไว้จะถูกเก็บไว้ ตลาดที่เจอใหม่จะมี `is_new=1`
 - **อย่าลบแถว** ให้ตั้ง `keep=0` แทน (ถ้าลบ แล้วรัน discover ซ้ำ แถวนั้นจะกลับมา)
+- หรือใส่ใน `review/keep.csv` (commit ได้ ใช้ได้ทั้งบนเครื่องและบน GitHub Actions — ชนะค่าใน markets.csv)
 
 ## Feature รอบตลาด
 

@@ -1,0 +1,149 @@
+# รัน pipeline หาทำเลตลาดบน GitHub แล้ว deploy dashboard ขึ้น Cloudflare Pages
+# ตั้งค่าครั้งแรก: ดู README หัวข้อ "รันบน GitHub Actions + Cloudflare Pages"
+name: Market pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      stages:
+        description: "ขั้นที่จะรัน"
+        type: choice
+        default: all
+        options:
+          - all        # discover → enrich → surround → dashboard
+          - discover   # หาตลาดอย่างเดียว → โหลด markets.csv จาก artifact ไปตรวจ แล้วใส่ review/keep.csv
+          - refresh    # enrich → surround → dashboard (ใช้รายชื่อตลาดเดิม + review/keep.csv)
+          - dashboard  # สร้าง dashboard ใหม่จากข้อมูลเดิม ไม่เรียก Google เลย
+      max_calls:
+        description: "เพดาน call ที่เสียเงินต่อขั้น (free cap: Text Search 5,000 / Details 1,000 / Aggregate 5,000 ต่อเดือน)"
+        default: "4900"
+      use_cache:
+        description: "ใช้ผลที่ดึงไว้แล้ว (ไม่เสีย quota ซ้ำ) — ปิดเมื่ออยากได้ข้อมูลใหม่จริง ๆ"
+        type: boolean
+        default: true
+      deploy:
+        description: "Deploy dashboard ขึ้น Cloudflare Pages"
+        type: boolean
+        default: true
+
+concurrency:
+  group: market-pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+      STAGES: ${{ inputs.stages }}
+      MAX_CALLS: ${{ inputs.max_calls }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      # data/ ไม่อยู่ใน repo (ข้อมูลจาก Google) — เก็บข้ามรอบใน Actions cache ของ repo นี้
+      # (cache ที่ไม่ถูกใช้ 7 วันจะถูกลบ ถ้าหายต้องรัน discover ใหม่)
+      - name: Restore data from previous runs
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/cache
+            data/markets.csv
+            data/market_details.csv
+            data/surroundings.csv
+          key: sitefinder-data-${{ github.run_id }}
+          restore-keys: sitefinder-data-
+
+      - name: Drop API cache (use_cache = false)
+        if: ${{ !inputs.use_cache }}
+        run: rm -rf data/cache
+
+      - name: Check API key
+        if: ${{ inputs.stages != 'dashboard' }}
+        run: |
+          if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
+            echo "::error::ยังไม่ได้ตั้ง secret GOOGLE_MAPS_API_KEY (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+
+      - name: 1. Discover markets
+        if: ${{ inputs.stages == 'all' || inputs.stages == 'discover' }}
+        run: python -m sitefinder discover --max-calls "$MAX_CALLS"
+
+      - name: Estimate quota
+        if: ${{ inputs.stages != 'dashboard' }}
+        run: python -m sitefinder estimate
+
+      - name: 2. Enrich (reviews, rating, hours)
+        if: ${{ inputs.stages == 'all' || inputs.stages == 'refresh' }}
+        run: python -m sitefinder enrich --max-calls "$MAX_CALLS"
+
+      - name: 3. Surroundings
+        if: ${{ inputs.stages == 'all' || inputs.stages == 'refresh' }}
+        run: python -m sitefinder surround --max-calls "$MAX_CALLS"
+
+      - name: 4. Score + dashboard
+        if: ${{ inputs.stages != 'discover' }}
+        run: |
+          python -m sitefinder score
+          python -m sitefinder dashboard
+
+      # บันทึกแม้ขั้นก่อนหน้าล้ม (เช่น ชน --max-calls) — รอบหน้าจะทำต่อจาก cache ไม่เสีย quota ซ้ำ
+      - name: Save data for next run
+        if: ${{ always() }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/cache
+            data/markets.csv
+            data/market_details.csv
+            data/surroundings.csv
+          key: sitefinder-data-${{ github.run_id }}
+
+      - name: Upload results (download from the run page)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: results
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            data/markets.csv
+            data/ranked.csv
+            data/dashboard.html
+            data/map.html
+
+      - name: Prepare site
+        if: ${{ inputs.deploy && inputs.stages != 'discover' }}
+        run: |
+          mkdir -p site
+          cp data/dashboard.html site/index.html
+          # ไม่ให้ search engine เก็บหน้า (ข้อมูลจาก Google ไม่ควรเผยแพร่สาธารณะ — ใช้ Cloudflare Access ครอบด้วย)
+          printf '/*\n  X-Robots-Tag: noindex, nofollow\n' > site/_headers
+          printf 'User-agent: *\nDisallow: /\n' > site/robots.txt
+
+      - name: Deploy to Cloudflare Pages
+        if: ${{ inputs.deploy && inputs.stages != 'discover' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'porpea-markets' }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::ข้าม deploy — ยังไม่ได้ตั้ง secret CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID (โหลด dashboard จาก artifact แทนได้)"
+            exit 0
+          fi
+          npx --yes wrangler@4 pages project create "$PROJECT" --production-branch=main 2>/dev/null \
+            && echo "created Pages project $PROJECT" || true
+          npx --yes wrangler@4 pages deploy site --project-name="$PROJECT" --branch=main --commit-dirty=true

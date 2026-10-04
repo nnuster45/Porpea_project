@@ -5,6 +5,7 @@ __pycache__/
 .venv/
 # ผลลัพธ์และ cache ของ API (มีข้อมูลจาก Google — ไม่ควรขึ้น repo)
 data/*
+# ไฟล์ที่คุณเตรียมเอง (นิคมฯ, 7-11) commit ได้ — GitHub Actions ต้องใช้
 !data/external/
-data/external/*
-!data/external/*.example.csv
+# review/keep.csv (place_id + keep + note ของคุณ) commit ได้เช่นกัน
+site/

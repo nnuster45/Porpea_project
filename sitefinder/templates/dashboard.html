@@ -157,6 +157,7 @@ tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-a
 tbody tr { cursor: pointer; }
 tbody tr:hover { background: var(--surface-2); }
 tbody tr.sel { background: var(--accent-soft); }
+tbody tr.hid { opacity: .45; }
 td.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 td.rank { color: var(--muted); width: 40px; }
 .mname { font-weight: 600; }
@@ -318,6 +319,13 @@ details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; co
     </section>
 
     <section class="card">
+      <h2>ตลาดที่ซ่อน (ไม่ใช่ตลาด)</h2>
+      <p class="hint">กด “ไม่ใช่ตลาด” ในแผงรายละเอียดเพื่อซ่อน แล้วดาวน์โหลด keep.csv ไป commit ที่ <code>review/keep.csv</code> — รอบหน้าจะไม่เสีย quota กับที่เหล่านี้</p>
+      <div class="field checks"><label><input type="checkbox" id="f-hidden">แสดงที่ซ่อนไว้ (<span id="n-hidden">0</span>)</label></div>
+      <div class="btnrow"><button id="btn-keep">⬇ keep.csv</button></div>
+    </section>
+
+    <section class="card">
       <h2>ตั้งค่าอื่น ๆ</h2>
       <div class="field">
         <label class="lbl" for="o-prior">ความเชื่อเรตติ้ง: ตลาดที่รีวิวน้อยกว่า <b id="o-prior-v"></b> รีวิวจะถูกดึงเข้าหาค่าเฉลี่ย</label>
@@ -459,7 +467,7 @@ function load() {
 function save() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
-      shortlist: S.shortlist, notes: S.notes, presets: S.presets, pillars: S.pillars,
+      shortlist: S.shortlist, notes: S.notes, hidden: S.hidden, presets: S.presets, pillars: S.pillars,
       prior: S.prior, topN: S.topN, topPct: S.thr,
     }));
   } catch (e) { /* storage unavailable — page still works */ }
@@ -473,8 +481,9 @@ const S = {
   topN: saved.topN ?? DATA.topN,
   thr: saved.topPct ?? DATA.profileTopPct,
   shortlist: saved.shortlist || {},
+  hidden: saved.hidden || {},
   notes: saved.notes || {},
-  filters: { q: "", kinds: new Set(), profiles: new Set(), amphoe: "", minReviews: 0, morning: false, evening: false, night: false, short: false },
+  filters: { q: "", kinds: new Set(), profiles: new Set(), amphoe: "", minReviews: 0, morning: false, evening: false, night: false, short: false, showHidden: false },
   sort: { key: "score", dir: -1 },
   selected: null,
 };
@@ -610,6 +619,7 @@ function setupFilters() {
   $("f-q").oninput = e => { S.filters.q = e.target.value.trim().toLowerCase(); scheduleUpdate(); };
   for (const k of ["morning", "evening", "night"]) $("f-" + k).onchange = e => { S.filters[k] = e.target.checked; update(); };
   $("f-short").onchange = e => { S.filters.short = e.target.checked; update(); };
+  $("f-hidden").onchange = e => { S.filters.showHidden = e.target.checked; update(); };
 
   const bind = (id, key) => {
     const el = $(id);
@@ -627,6 +637,7 @@ function profiles(i) {
 
 function passes(m, i) {
   const F = S.filters;
+  if (S.hidden[m.id] && !F.showHidden) return false;
   if (F.q && !(m.name + " " + m.address).toLowerCase().includes(F.q)) return false;
   if (F.kinds.size && !F.kinds.has(m.kind)) return false;
   if (F.profiles.size && !profiles(i).some(t => F.profiles.has(t))) return false;
@@ -667,6 +678,7 @@ function update() {
   $("st-shown").textContent = fmt(rows.length);
   $("st-total").textContent = fmt(MARKETS.length);
   $("st-short").textContent = fmt(Object.values(S.shortlist).filter(Boolean).length);
+  $("n-hidden").textContent = fmt(Object.keys(S.hidden).length);
   renderTable();
   renderMap();
   if (S.selected !== null) renderDetail(S.selected);
@@ -712,7 +724,7 @@ function renderTable() {
       const v = p.scores[i] * 100;
       return `<td class="col-pillar" title="${esc(p.label)}: ${fmt(v)}"><div class="minibar"><b>${fmt(v)}</b><div class="bar"><span style="width:${Math.max(0, Math.min(100, v))}%"></span></div></div></td>`;
     }).join("");
-    return `<tr data-i="${i}" class="${S.selected === i ? "sel" : ""}">
+    return `<tr data-i="${i}" class="${S.selected === i ? "sel" : ""} ${S.hidden[m.id] ? "hid" : ""}">
       <td><button class="star" data-star="${i}" aria-pressed="${!!S.shortlist[m.id]}" aria-label="ติดดาว">${S.shortlist[m.id] ? "★" : "☆"}</button></td>
       <td class="rank num">${S.rank[i]}</td>
       <td><div class="mname">${esc(m.name)}</div><div class="msub">${esc(m.kind)} · ${esc(m.amphoe)}${m.rating ? ` · ★ ${Number(m.rating).toFixed(1)}` : ""}</div></td>
@@ -839,6 +851,7 @@ function renderDetail(i) {
     <div class="btnrow">
       <button class="star" id="d-star" aria-pressed="${!!S.shortlist[m.id]}" style="border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:14px">${S.shortlist[m.id] ? "★ ติดดาวแล้ว" : "☆ ติดดาวไว้ลงพื้นที่"}</button>
       ${m.url ? `<a class="linkbtn" href="${esc(m.url)}" target="_blank" rel="noopener">เปิดใน Google Maps ↗</a>` : ""}
+      <button id="d-hide">${S.hidden[m.id] ? "↩ เอากลับมา" : "🚫 ไม่ใช่ตลาด"}</button>
     </div>
 
     <h4>คะแนนมาจากไหน</h4>
@@ -857,6 +870,10 @@ function renderDetail(i) {
     renderMap();
   };
   $("d-star").onclick = () => toggleStar(i);
+  $("d-hide").onclick = () => {
+    if (S.hidden[m.id]) delete S.hidden[m.id]; else S.hidden[m.id] = true;
+    update();
+  };
   $("d-note").oninput = e => {
     const v = e.target.value;
     if (v.trim()) S.notes[m.id] = v; else delete S.notes[m.id];
@@ -929,6 +946,19 @@ $("btn-export").onclick = () => {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `ตลาด_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+$("btn-keep").onclick = () => {
+  const ids = Object.keys(S.hidden);
+  if (!ids.length) { modal(`<h3>ยังไม่มีตลาดที่ซ่อน</h3><p class="hint">คลิกตลาด แล้วกด “🚫 ไม่ใช่ตลาด” ในแผงรายละเอียด</p><div class="btnrow"><button data-close>ปิด</button></div>`); return; }
+  const q = v => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  const lines = ["place_id,keep,note", ...ids.map(id => [id, 0, (S.notes[id] || "ซ่อนจาก dashboard").replace(/\n/g, " ")].map(v => q(String(v))).join(","))];
+  const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "keep.csv";
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
