@@ -57,16 +57,39 @@ def google_counts(markets, client, specs, log=print):
     return pd.DataFrame(rows)
 
 
+class _GiveUp:
+    """Stop calling a service after `limit` failures in a row (e.g. it rejects every request)."""
+
+    def __init__(self, what, log, limit=5):
+        self.what, self.log, self.limit, self.streak = what, log, limit, 0
+
+    @property
+    def dead(self):
+        return self.streak >= self.limit
+
+    def ok(self):
+        self.streak = 0
+
+    def fail(self, where, err):
+        self.streak += 1
+        self.log(f"  ! {self.what} failed for {where}: {err}")
+        if self.dead:
+            self.log(f"  ! {self.what}: {self.limit} failures in a row — skipping the rest (left empty)")
+
+
 def osm_counts(markets, overpass, osm_filters, radii, log=print):
     rows = []
+    guard = _GiveUp("overpass", log)
     for i, m in enumerate(markets.itertuples(index=False), 1):
         row = {"place_id": m.place_id}
         for r in radii:
-            try:
-                counts = overpass.count(m.lat, m.lng, r, osm_filters)
-            except Exception as e:  # Overpass is a shared free service; keep going on errors
-                log(f"  ! overpass failed for {m.name} r={r}: {e}")
-                counts = {k: np.nan for k in osm_filters}
+            counts = {k: np.nan for k in osm_filters}
+            if not guard.dead:
+                try:
+                    counts = overpass.count(m.lat, m.lng, r, osm_filters)
+                    guard.ok()
+                except Exception as e:  # Overpass is a shared free service; keep going on errors
+                    guard.fail(f"{m.name} r={r}", e)
             for feature, n in counts.items():
                 row[f"{feature}_{r}"] = n
         rows.append(row)
@@ -78,14 +101,17 @@ def osm_counts(markets, overpass, osm_filters, radii, log=print):
 def osm_areas(markets, overpass, area_filters, radii, log=print):
     """`<feature>_ha_<r>`: hectares of the land use inside each radius (big plants weigh more)."""
     rows = []
+    guard = _GiveUp("overpass area", log)
     for i, m in enumerate(markets.itertuples(index=False), 1):
         row = {"place_id": m.place_id}
         for feature, filters in area_filters.items():
-            try:
-                areas = overpass.area_ha(m.lat, m.lng, radii, filters)
-            except Exception as e:
-                log(f"  ! overpass area failed for {m.name} {feature}: {e}")
-                areas = {r: np.nan for r in radii}
+            areas = {r: np.nan for r in radii}
+            if not guard.dead:
+                try:
+                    areas = overpass.area_ha(m.lat, m.lng, radii, filters)
+                    guard.ok()
+                except Exception as e:
+                    guard.fail(f"{m.name} {feature}", e)
             for r, ha in areas.items():
                 row[f"{feature}_ha_{r}"] = ha
         rows.append(row)

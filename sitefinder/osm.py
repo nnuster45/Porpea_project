@@ -8,6 +8,8 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import polygonize, unary_union
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# overpass-api.de rejects generic client User-Agents (python-requests/…) with 406 Not Acceptable
+USER_AGENT = "porpea-sitefinder/1.0 (market site selection; +https://github.com/nnuster45/Porpea_project)"
 
 
 def build_count_query(lat, lng, radius_m, feature_filters):
@@ -71,6 +73,7 @@ class OverpassClient:
         self.url = url
         self.min_interval_s = min_interval_s
         self.session = session or requests.Session()
+        self.session.headers.update({"User-Agent": USER_AGENT, "Accept": "application/json"})
         self.calls = 0
         self._last_call = 0.0
 

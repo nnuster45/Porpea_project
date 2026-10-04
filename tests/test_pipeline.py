@@ -497,3 +497,38 @@ def test_load_markets_applies_review(tmp_path, monkeypatch):
     pd.DataFrame({"place_id": ["a", "b"], "keep": [1, 1]}).to_csv("data/markets.csv", index=False)
     (tmp_path / "review" / "keep.csv").write_text("place_id,keep\nb,0\n", encoding="utf-8")
     assert cli.load_markets()["place_id"].tolist() == ["a"]
+
+
+def test_osm_gives_up_after_repeated_failures(markets):
+    from sitefinder.surround import osm_counts
+
+    class Rejecting:
+        calls = 0
+
+        def count(self, *a):
+            Rejecting.calls += 1
+            raise RuntimeError("406 Not Acceptable")
+
+    big = pd.concat([markets] * 4, ignore_index=True)  # 20 markets
+    logs = []
+    df = osm_counts(big, Rejecting(), {"school": ["s"]}, [500], log=logs.append)
+    assert Rejecting.calls == 5 and df["school_500"].isna().all() and len(df) == 20
+    assert any("skipping the rest" in m for m in logs)
+
+
+def test_overpass_client_sends_user_agent(tmp_path):
+    from sitefinder.osm import OverpassClient
+
+    seen = {}
+
+    class Session:
+        headers = {}
+
+        def post(self, url, data, timeout):
+            seen.update(self.headers)
+            return FakeResp(200, {"elements": [{"type": "count", "tags": {"total": "3"}}]})
+
+    FakeResp.raise_for_status = lambda self: None
+    client = OverpassClient(DiskCache(tmp_path), session=Session(), min_interval_s=0)
+    assert client.count(13.0, 101.0, 500, {"school": ['nwr["amenity"="school"]']}) == {"school": 3}
+    assert "porpea-sitefinder" in seen["User-Agent"]
