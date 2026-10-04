@@ -41,6 +41,8 @@ jobs:
       GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
       STAGES: ${{ inputs.stages }}
       MAX_CALLS: ${{ inputs.max_calls }}
+      PYTHONUNBUFFERED: "1"  # show progress in the log as it happens
+      OSM_PBF_URL: ${{ vars.OSM_PBF_URL || 'https://download.geofabrik.de/asia/thailand-latest.osm.pbf' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -93,6 +95,29 @@ jobs:
       - name: 2. Enrich (reviews, rating, hours)
         if: ${{ inputs.stages == 'all' || inputs.stages == 'refresh' }}
         run: python -m sitefinder enrich --max-calls "$MAX_CALLS"
+
+      # OSM จากไฟล์ทั้งประเทศ (Geofabrik) แทน Overpass API — Overpass จำกัดความถี่ IP ของ GitHub หนักมาก
+      - name: OSM week
+        id: osmweek
+        if: ${{ inputs.stages == 'all' || inputs.stages == 'refresh' }}
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache OSM extract (weekly)
+        if: ${{ inputs.stages == 'all' || inputs.stages == 'refresh' }}
+        uses: actions/cache@v4
+        with:
+          path: data/osm/region.osm.pbf
+          key: osm-pbf-${{ steps.osmweek.outputs.week }}
+
+      - name: OSM features for the area
+        if: ${{ inputs.stages == 'all' || inputs.stages == 'refresh' }}
+        run: |
+          if [ ! -s data/osm/region.osm.pbf ]; then
+            mkdir -p data/osm
+            curl -fsSL --retry 3 -o data/osm/region.osm.pbf "$OSM_PBF_URL"
+          fi
+          ls -lh data/osm/region.osm.pbf
+          python -m sitefinder osm-extract --pbf data/osm/region.osm.pbf
 
       - name: 3. Surroundings
         if: ${{ inputs.stages == 'all' || inputs.stages == 'refresh' }}

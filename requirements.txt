@@ -5,3 +5,4 @@ pyyaml>=6.0
 folium>=0.15
 pytest>=7.0
 shapely>=2.0
+osmium>=4.0

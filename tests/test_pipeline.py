@@ -532,3 +532,89 @@ def test_overpass_client_sends_user_agent(tmp_path):
     client = OverpassClient(DiskCache(tmp_path), session=Session(), min_interval_s=0)
     assert client.count(13.0, 101.0, 500, {"school": ['nwr["amenity"="school"]']}) == {"school": 3}
     assert "porpea-sitefinder" in seen["User-Agent"]
+
+
+# ---------- local OSM extract (no Overpass) ----------
+
+def _square_nodes(start_id, lat0, lng0, half_m):
+    dlat = half_m / 111_320
+    dlng = half_m / (111_320 * np.cos(np.radians(lat0)))
+    pts = [(lat0 - dlat, lng0 - dlng), (lat0 - dlat, lng0 + dlng), (lat0 + dlat, lng0 + dlng), (lat0 + dlat, lng0 - dlng)]
+    return [(start_id + i, la, lo) for i, (la, lo) in enumerate(pts)]
+
+
+def _write_osm(path):
+    nodes, ways, rels = [], [], []
+    # school + bus stops as nodes; one bus stop far outside the bbox
+    nodes += [(1, 13.000, 101.000, {"amenity": "school"}), (2, 13.002, 101.000, {"highway": "bus_stop"}),
+              (3, 13.010, 101.000, {"highway": "bus_stop"}), (4, 15.0, 103.0, {"highway": "bus_stop"})]
+    # a school mapped as a closed way 300 m north
+    sq = _square_nodes(10, 13.0027, 101.0, 30)
+    nodes += [(i, la, lo, {}) for i, la, lo in sq]
+    ways.append((100, [n[0] for n in sq] + [sq[0][0]], {"amenity": "school"}))
+    # industrial: a 200 m square way + a 200 m square multipolygon split into two ways, 3 km apart
+    a = _square_nodes(20, 13.000, 101.010, 100)
+    nodes += [(i, la, lo, {}) for i, la, lo in a]
+    ways.append((101, [n[0] for n in a] + [a[0][0]], {"landuse": "industrial"}))
+    b = _square_nodes(30, 13.027, 101.000, 100)
+    nodes += [(i, la, lo, {}) for i, la, lo in b]
+    ways += [(102, [b[0][0], b[1][0], b[2][0]], {}), (103, [b[2][0], b[3][0], b[0][0]], {})]
+    rels.append((200, [102, 103], {"type": "multipolygon", "landuse": "industrial"}))
+    tag = lambda t: "".join(f'<tag k="{k}" v="{v}"/>' for k, v in t.items())
+    xml = ['<?xml version="1.0" encoding="UTF-8"?><osm version="0.6" generator="test">']
+    xml += [f'<node id="{i}" version="1" lat="{la}" lon="{lo}">{tag(t)}</node>' for i, la, lo, t in sorted(nodes)]
+    xml += [f'<way id="{i}" version="1">' + "".join(f'<nd ref="{r}"/>' for r in refs) + tag(t) + "</way>" for i, refs, t in ways]
+    xml += [f'<relation id="{i}" version="1">' + "".join(f'<member type="way" ref="{r}" role="outer"/>' for r in mem)
+            + tag(t) + "</relation>" for i, mem, t in rels]
+    xml.append("</osm>")
+    path.write_text("".join(xml), encoding="utf-8")
+
+
+def test_local_osm_extract_counts_and_areas(tmp_path):
+    pytest.importorskip("osmium")
+    from sitefinder.osm_local import LocalOSM, extract, load, parse_filter, save
+
+    assert parse_filter('nwr["amenity"="school"]') == ("nwr", "amenity", "school")
+    assert parse_filter('relation["landuse"]') == ("r", "landuse", None)
+    with pytest.raises(ValueError):
+        parse_filter('nwr["a"~"b"]')
+
+    osm = tmp_path / "t.osm"
+    _write_osm(osm)
+    bbox = {"south": 12.9, "north": 13.1, "west": 100.9, "east": 101.1}
+    data = extract(osm, bbox,
+                   {"school": ['nwr["amenity"="school"]'], "transit": ['nwr["highway"="bus_stop"]']},
+                   {"industrial": ['way["landuse"="industrial"]', 'relation["landuse"="industrial"]']},
+                   log=lambda *_: None)
+    assert len(data["points"]["school"]) == 2          # node + closed way (centroid)
+    assert len(data["points"]["transit"]) == 2         # the far-away stop is outside the bbox
+    assert len(data["areas"]["industrial"]) == 2       # way + assembled multipolygon
+    save(data, tmp_path / "f.json")
+
+    local = LocalOSM(load(tmp_path / "f.json"))
+    assert local.has(["school", "transit", "industrial"]) and not local.has(["hospital"])
+    assert local.count(13.0, 101.0, 500, {"school": [], "transit": []}) == {"school": 2, "transit": 1}
+    assert local.count(13.0, 101.0, 1500, {"transit": []}) == {"transit": 2}
+    ha = local.area_ha(13.0, 101.0, [500, 1500, 5000], feature="industrial")
+    assert ha[500] == 0                                  # nearest square is ~1 km east
+    assert ha[1500] == pytest.approx(4.0, rel=0.02)      # one 200 m × 200 m square
+    assert ha[5000] == pytest.approx(8.0, rel=0.02)      # both
+
+
+def test_surround_uses_local_osm_via_cli(tmp_path, monkeypatch):
+    pytest.importorskip("osmium")
+    from sitefinder import cli
+    from sitefinder.osm_local import LocalOSM, extract, save
+
+    monkeypatch.chdir(tmp_path)
+    osm = tmp_path / "t.osm"
+    _write_osm(osm)
+    cfg = {"area": {"bbox": {"south": 12.9, "north": 13.1, "west": 100.9, "east": 101.1}},
+           "surroundings": {"source": "google_aggregate", "radii_m": [500],
+                            "osm_extra": {"transit": ['nwr["highway"="bus_stop"]']},
+                            "osm_area": {"industrial": ['way["landuse"="industrial"]']}}}
+    assert not isinstance(cli.overpass_client(cfg), LocalOSM)   # no extract yet → Overpass
+    cli.cmd_osm_extract(cfg, type("A", (), {"pbf": str(osm)})())
+    assert isinstance(cli.overpass_client(cfg), LocalOSM)
+    cfg["surroundings"]["osm_extra"]["school"] = ['nwr["amenity"="school"]']
+    assert not isinstance(cli.overpass_client(cfg), LocalOSM)   # extract lacks a feature → fallback

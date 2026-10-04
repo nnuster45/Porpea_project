@@ -63,6 +63,9 @@ discover ──► enrich ──► surround ──► dashboard
 3. ใช้ dashboard ไปเรื่อย ๆ เจอที่ไม่ใช่ตลาดกด **🚫 ไม่ใช่ตลาด** → **⬇ keep.csv** → แทนที่ `review/keep.csv` → commit → รัน `dashboard`
 
 ข้อควรรู้
+- ข้อมูล OSM (ป้ายรถ, โรงเรียน, โรงพยาบาล, พื้นที่โรงงาน) มาจากไฟล์ทั้งประเทศของ Geofabrik
+  (ดาวน์โหลดสัปดาห์ละครั้ง) แทน Overpass API ซึ่งจำกัดความถี่ IP ของ GitHub จนรันไม่จบ
+  — เปลี่ยนประเทศ/ภูมิภาคได้ด้วย Variable `OSM_PBF_URL`
 - ผลจาก API เก็บใน **Actions cache** ของ repo — รันซ้ำไม่เสีย quota ซ้ำ (`use_cache` = true)
   อยากได้ข้อมูลใหม่จริง ๆ (เช่น ทุก 2–3 เดือน) ให้ปิด `use_cache` — จะเสีย quota ตามจริง
 - cache ที่ไม่ถูกใช้ **7 วัน** GitHub จะลบทิ้ง → ต้องรัน `discover`/`all` ใหม่ (ค่า keep ใน `review/keep.csv` ยังอยู่)
@@ -110,6 +113,7 @@ python -m sitefinder estimate # ดูจำนวน call ก่อนใช้
 | **คัดกรอง** `data/markets.csv` | ตั้ง `keep=0` ให้แถวที่ไม่ใช่ตลาดจริง (ระบบเดาให้แล้วบางส่วน ดูเหตุผลในคอลัมน์ `note`) — ขั้นต่อจากนี้ใช้เฉพาะ `keep=1` | |
 | `python -m sitefinder estimate` | เช็กว่าจำนวนตลาดที่เหลืออยู่ใน free cap ไหม | |
 | `python -m sitefinder enrich` | ดึงเรตติ้ง, จำนวนรีวิว, เวลาเปิด → แปลงเป็น `open_morning/evening/night`, `days_open` | `data/market_details.csv` |
+| *(ไม่บังคับ)* `python -m sitefinder osm-extract --pbf thailand-latest.osm.pbf` | ใช้ไฟล์ OSM ทั้งประเทศ ([Geofabrik](https://download.geofabrik.de/asia/thailand.html)) แทน Overpass API — เร็วกว่า ไม่ติด rate limit | `data/osm/features.json` |
 | `python -m sitefinder surround` | นับ POI รอบตลาด (Google + OSM), ขนาดพื้นที่อุตสาหกรรม, จำนวนคนงานนิคมฯ, 7-11 | `data/surroundings.csv` |
 | `python -m sitefinder score` | จัดอันดับตาม `scoring.pillars` (คะแนนรวม + คะแนนหมวด + ป้ายย่าน) | `data/ranked.csv` |
 | `python -m sitefinder map` | แผนที่อย่างเดียว (คลิกหมุดดูคะแนน/เหตุผล/ลิงก์ Google Maps) | `data/map.html` |

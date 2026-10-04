@@ -103,7 +103,7 @@ class OverpassClient:
         data = self.fetch(build_count_query(lat, lng, radius_m, feature_filters))
         return parse_counts(data, list(feature_filters))
 
-    def area_ha(self, lat, lng, radii_m, filters):
+    def area_ha(self, lat, lng, radii_m, filters, feature=None):
         """Hectares of matching land use within each radius (one query at the largest radius)."""
         data = self.fetch(build_geom_query(lat, lng, max(radii_m), filters))
         return clipped_area_ha(polygons_from_overpass(data, _to_local_m(lat, lng)), radii_m)

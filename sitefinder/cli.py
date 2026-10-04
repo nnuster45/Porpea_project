@@ -20,6 +20,7 @@ MAP = DATA / "map.html"
 DASHBOARD = DATA / "dashboard.html"
 CACHE = DATA / "cache"
 REVIEW = Path("review") / "keep.csv"  # committed overrides: place_id, keep, note
+OSM_LOCAL = DATA / "osm" / "features.json"  # from `osm-extract`; used instead of Overpass when present
 
 
 def load_env(path=".env"):
@@ -47,10 +48,40 @@ def google_client(args):
     return GoogleClient(key, DiskCache(CACHE), max_calls=args.max_calls)
 
 
-def overpass_client():
+def osm_features(cfg):
+    """(point features, area features) the config needs from OSM."""
+    sc = cfg["surroundings"]
+    points = dict(sc.get("osm_extra") or {})
+    if sc["source"] == "osm":
+        points = {**sc["osm_filters"], **points}
+    return points, dict(sc.get("osm_area") or {})
+
+
+def overpass_client(cfg=None):
+    """Local OSM extract if `osm-extract` was run (no rate limits), else the Overpass API."""
     from .osm import OverpassClient
 
+    if cfg is not None and OSM_LOCAL.exists():
+        from .osm_local import LocalOSM, load
+
+        local = LocalOSM(load(OSM_LOCAL))
+        points, areas = osm_features(cfg)
+        if local.has(list(points) + list(areas)):
+            print(f"  OSM: using local extract {OSM_LOCAL}")
+            return local
+        print(f"  OSM: {OSM_LOCAL} lacks some features — re-run `osm-extract`; falling back to Overpass")
     return OverpassClient(DiskCache(CACHE))
+
+
+def cmd_osm_extract(cfg, args):
+    from .osm_local import extract, save
+
+    if not args.pbf or not Path(args.pbf).exists():
+        sys.exit("give --pbf path/to/region-latest.osm.pbf (e.g. https://download.geofabrik.de/asia/thailand-latest.osm.pbf)")
+    points, areas = osm_features(cfg)
+    data = extract(args.pbf, cfg["area"]["bbox"], points, areas)
+    save(data, OSM_LOCAL)
+    print(f"→ {OSM_LOCAL}")
 
 
 def need(path, stage):
@@ -185,7 +216,7 @@ def cmd_surround(cfg, args):
     markets = load_markets()
     gc = google_client(args) if cfg["surroundings"]["source"] == "google_aggregate" else None
     try:
-        df = surround(cfg, markets, google_client=gc, overpass=overpass_client())
+        df = surround(cfg, markets, google_client=gc, overpass=overpass_client(cfg))
     finally:
         if gc:
             print(gc.usage_report())
@@ -241,6 +272,7 @@ def cmd_all(cfg, args):
 COMMANDS = {
     "estimate": (cmd_estimate, "estimate API calls before spending quota"),
     "review": (cmd_review, "summarise data/markets.csv by type/keyword to decide what to drop"),
+    "osm-extract": (cmd_osm_extract, "read a Geofabrik .osm.pbf (--pbf) → data/osm/features.json, used instead of Overpass"),
     "discover": (cmd_discover, "1. find markets (Text Search) → data/markets.csv"),
     "enrich": (cmd_enrich, "2. reviews / rating / opening hours → data/market_details.csv"),
     "surround": (cmd_surround, "3. count POIs around each market → data/surroundings.csv"),
@@ -257,6 +289,7 @@ def main(argv=None):
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--max-calls", type=int, default=4900, help="stop after this many billable Google calls in one run (cached calls are free)")
     parser.add_argument("--markets", type=int, default=400, help="assumed market count for `estimate`")
+    parser.add_argument("--pbf", help="OSM .osm.pbf file for `osm-extract`")
     args = parser.parse_args(argv)
 
     load_env()

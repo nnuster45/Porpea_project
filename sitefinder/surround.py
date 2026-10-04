@@ -108,7 +108,7 @@ def osm_areas(markets, overpass, area_filters, radii, log=print):
             areas = {r: np.nan for r in radii}
             if not guard.dead:
                 try:
-                    areas = overpass.area_ha(m.lat, m.lng, radii, filters)
+                    areas = overpass.area_ha(m.lat, m.lng, radii, filters, feature=feature)
                     guard.ok()
                 except Exception as e:
                     guard.fail(f"{m.name} {feature}", e)
