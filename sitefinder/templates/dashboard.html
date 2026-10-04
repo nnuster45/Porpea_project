@@ -247,7 +247,21 @@ textarea { width: 100%; min-height: 70px; border: 1px solid var(--border); borde
 /* ---------- pillars ---------- */
 .prow { padding: 8px 0; border-top: 1px solid var(--border); }
 .prow:first-child { border-top: 0; padding-top: 2px; }
-.prow .ph { display: grid; grid-template-columns: 1fr 110px 26px; gap: 8px; align-items: center; }
+.prow .ph { display: grid; grid-template-columns: 18px 1fr 110px 26px; gap: 8px; align-items: center; }
+.prow .pt { border: 0; background: none; padding: 0; width: 18px; height: 22px; color: var(--muted); cursor: pointer; font-size: 12px; transition: transform .15s; }
+.prow .pt:hover { color: var(--accent-ink); }
+.prow.open .pt { transform: rotate(90deg); }
+.prow .pl { cursor: pointer; }
+.prow .pm { margin-left: 26px; }
+.prow .pin { margin: 6px 0 2px 26px; padding: 2px 0 2px 10px; border-left: 2px solid var(--border); }
+.prow .pin .hint { margin: 2px 0 6px; }
+.mrow { display: grid; grid-template-columns: 1fr 84px 22px 22px; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px dashed var(--border); }
+.mrow .ml { font-size: 12.5px; line-height: 1.3; }
+.mrow.nodata .ml { color: var(--muted); }
+.mrow output { text-align: right; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.mrow .rm { border: 0; background: none; padding: 0; color: var(--muted); cursor: pointer; font-size: 13px; }
+.mrow .rm:hover { color: var(--s4, #b42318); }
+.prow .add { margin-top: 6px; font-size: 12px; padding: 3px 4px; border: 1px dashed var(--border); border-radius: 6px; background: var(--surface); width: 100%; color: var(--text-2); }
 .prow .pl { font-weight: 600; font-size: 13.5px; line-height: 1.3; }
 .prow output { text-align: right; font-variant-numeric: tabular-nums; color: var(--accent-ink); font-weight: 600; }
 .prow.off .pl, .prow.off output { color: var(--muted); font-weight: 500; }
@@ -271,13 +285,6 @@ textarea { width: 100%; min-height: 70px; border: 1px solid var(--border); borde
 .share-l { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11.5px; color: var(--muted); }
 .share-l i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
 details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; color: var(--text-2); padding: 4px 0; }
-.arow { display: grid; grid-template-columns: 1fr 104px; gap: 4px 8px; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--border); }
-.arow .al { font-size: 12.5px; line-height: 1.3; }
-.arow select { font-size: 12px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); width: 100%; }
-.arow .aw { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 26px; gap: 8px; align-items: center; }
-.arow .aw output { text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.arow.unused { opacity: .6; }
-.ahead { font-size: 12px; font-weight: 700; color: var(--muted); margin: 12px 0 2px; }
 .minibar { display: flex; align-items: center; gap: 5px; min-width: 64px; }
 .minibar .bar { min-width: 34px; height: 5px; }
 .minibar b { font-weight: 500; font-size: 12px; color: var(--text-2); width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
@@ -302,7 +309,7 @@ details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; co
   <aside class="side" id="side">
     <section class="card">
       <h2><span class="step">1</span>ให้ความสำคัญกับอะไร</h2>
-      <p class="hint">ทุกตลาดถูกเทียบกันในแต่ละหมวด — เลื่อนไปทางขวา = สำคัญมาก, ซ้ายสุด = ไม่นำมาคิด</p>
+      <p class="hint">ทุกตลาดถูกเทียบกันในแต่ละหมวด — เลื่อนไปทางขวา = สำคัญมาก, ซ้ายสุด = ไม่นำมาคิด · กด ▸ เพื่อดู/ปรับว่าหมวดนั้นนับจากอะไร</p>
       <div id="custom-note" class="notice" hidden></div>
       <div id="presets" class="chips" style="margin-bottom:8px"></div>
       <div id="pillars"></div>
@@ -313,14 +320,6 @@ details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; co
         <button id="btn-save">บันทึกชุดนี้</button>
         <button id="btn-yaml">ส่งออกไป config</button>
       </div>
-    </section>
-
-    <section class="card">
-      <details class="adv" id="adv">
-        <summary>ตั้งค่าขั้นสูง: ตัววัดในแต่ละหมวด</summary>
-        <p class="hint" style="margin-top:6px">ย้ายตัววัดเข้า/ออกหมวด และปรับน้ำหนักภายในหมวด — ตัววัดหนึ่งอยู่ได้หมวดเดียว กันการนับซ้ำ</p>
-        <div id="advlist"></div>
-      </details>
     </section>
 
     <section class="card">
@@ -551,7 +550,8 @@ const S = {
              morning: false, evening: false, night: false, unknown: true, short: false, showHidden: false },
   sort: { key: "score", dir: -1 },
   selected: null,
-  openItems: new Set(),  // measure lists left open stay open when you click the next market
+  openItems: new Set(),
+  openPillars: new Set(),  // pillars expanded to show their measures  // measure lists left open stay open when you click the next market
 };
 const isDefault = () => JSON.stringify(S.pillars) === JSON.stringify(DATA.pillars);
 const hasData = key => (key === "reviews" || key === "rating")
@@ -594,27 +594,83 @@ function renderNotice() {
   if (b) b.onclick = () => { S.pillars = clone(DATA.pillars); renderAll(); };
 }
 
+// each pillar: a weight slider, and ▸ to see / tune which measures it is made of (weights inside the pillar)
 function renderPillars() {
   const box = $("pillars");
   box.innerHTML = "";
   for (const p of S.pillars) {
+    const open = S.openPillars.has(p.key);
     const row = document.createElement("div");
-    row.className = "prow" + (p.weight ? "" : " off");
+    row.className = "prow" + (p.weight ? "" : " off") + (open ? " open" : "");
     const id = "p-" + p.key;
-    row.innerHTML = `<div class="ph"><label class="pl" for="${esc(id)}">${esc(p.label)}</label>
+    row.innerHTML = `<div class="ph"><button class="pt" aria-expanded="${open}" aria-label="ตัววัดในหมวดนี้">▶</button>
+        <label class="pl" for="${esc(id)}">${esc(p.label)}</label>
         <input type="range" id="${esc(id)}" min="0" max="5" step="0.5" value="${p.weight}"><output>${p.weight}</output></div>
-      <div class="pm">${measureSummary(p)}</div>`;
-    const input = row.querySelector("input");
+      ${open ? measureEditor(p) : `<div class="pm">${measureSummary(p)}</div>`}`;
+    const input = row.querySelector(".ph input");
     input.oninput = () => {
       p.weight = parseFloat(input.value);
-      row.querySelector("output").textContent = p.weight;
+      row.querySelector(".ph output").textContent = p.weight;
       row.classList.toggle("off", !p.weight);
       renderShare(); renderPresets(); renderNotice();
       scheduleUpdate();
     };
+    const toggle = () => {
+      if (S.openPillars.has(p.key)) S.openPillars.delete(p.key); else S.openPillars.add(p.key);
+      renderPillars();
+    };
+    row.querySelector(".pt").onclick = toggle;
+    row.querySelector(".pl").onclick = e => { e.preventDefault(); toggle(); };
+    if (open) wireMeasureEditor(row, p);
     box.appendChild(row);
   }
   renderShare();
+}
+
+function measureEditor(p) {
+  const keys = Object.keys(p.measures);
+  const rows = keys.map(k => {
+    const w = p.measures[k];
+    return `<div class="mrow${hasData(k) ? "" : " nodata"}" data-key="${esc(k)}">
+      <div class="ml">${esc(FEAT[k]?.label || k)}${radTag(k)}${hasData(k) ? "" : `<span class="rad">ไม่มีข้อมูล</span>`}</div>
+      <input type="range" min="0" max="5" step="0.5" value="${w}" aria-label="น้ำหนักในหมวด">
+      <output>${w}</output>
+      <button class="rm" title="เอาออกจากหมวดนี้" aria-label="เอาออก">✕</button></div>`;
+  }).join("");
+  const free = DATA.features.map(f => f.key).filter(k => !pillarOf(k) && hasData(k) && k !== "dup_count");
+  const elsewhere = S.pillars.filter(x => x !== p && Object.keys(x.measures).length);
+  const opt = k => `<option value="${esc(k)}">${esc(featLabel(k))}</option>`;
+  const add = `<select class="add" aria-label="เพิ่มตัววัด"><option value="">＋ เพิ่มตัววัดในหมวดนี้…</option>
+      ${free.length ? `<optgroup label="ยังไม่ได้ใช้">${free.map(opt).join("")}</optgroup>` : ""}
+      ${elsewhere.map(x => `<optgroup label="ย้ายมาจาก: ${esc(SHORT[x.key] || x.label)}">${Object.keys(x.measures).map(opt).join("")}</optgroup>`).join("")}
+    </select>`;
+  return `<div class="pin">
+    <p class="hint">น้ำหนักภายในหมวด — ตัววัดหนึ่งอยู่ได้หมวดเดียว กันการนับซ้ำ</p>
+    ${rows || `<p class="hint">ยังไม่มีตัววัด</p>`}${add}</div>`;
+}
+
+function wireMeasureEditor(row, p) {
+  const changed = () => { renderPillars(); renderPresets(); renderNotice(); update(); };
+  row.querySelectorAll(".mrow").forEach(el => {
+    const key = el.dataset.key;
+    const r = el.querySelector("input");
+    r.oninput = () => {
+      p.measures[key] = parseFloat(r.value);
+      el.querySelector("output").textContent = r.value;
+      renderNotice();
+      scheduleUpdate();
+    };
+    el.querySelector(".rm").onclick = () => { delete p.measures[key]; changed(); };
+  });
+  row.querySelector(".add").onchange = e => {
+    const key = e.target.value;
+    if (!key) return;
+    const from = pillarOf(key);
+    const w = from ? from.measures[key] : 1;
+    if (from) delete from.measures[key];
+    p.measures[key] = w || 1;
+    changed();
+  };
 }
 
 function renderShare() {
@@ -623,48 +679,6 @@ function renderShare() {
   const colors = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)"];
   $("share-l").innerHTML = S.pillars.map((p, i) =>
     `<span><i style="background:${colors[i % 5]}"></i>${esc(SHORT[p.key] || p.label)} ${Math.round(Math.abs(p.weight) / tot * 100)}%</span>`).join("");
-}
-
-function renderAdvanced() {
-  const box = $("advlist");
-  const opts = p => `<option value="">— ไม่ใช้ —</option>` + S.pillars.map(x =>
-    `<option value="${esc(x.key)}" ${p && p.key === x.key ? "selected" : ""}>${esc(SHORT[x.key] || x.label)}</option>`).join("");
-  const row = key => {
-    const p = pillarOf(key);
-    const w = p ? p.measures[key] : 0;
-    const ok = hasData(key);
-    return `<div class="arow ${p ? "" : "unused"}" data-key="${esc(key)}">
-      <div class="al">${esc(FEAT[key]?.label || key)}${radTag(key)}${ok ? "" : `<span class="rad">ไม่มีข้อมูล</span>`}</div>
-      <select aria-label="หมวด">${opts(p)}</select>
-      ${p ? `<div class="aw"><input type="range" min="0" max="5" step="0.5" value="${w}" aria-label="น้ำหนักในหมวด"><output>${w}</output></div>` : ""}
-    </div>`;
-  };
-  let html = "";
-  for (const p of S.pillars) {
-    const keys = Object.keys(p.measures);
-    html += `<div class="ahead">${esc(p.label)}</div>` + (keys.length ? keys.map(row).join("") : `<div class="hint">ยังไม่มีตัววัด</div>`);
-  }
-  const unused = DATA.features.map(f => f.key).filter(k => !pillarOf(k));
-  if (unused.length) html += `<div class="ahead">ไม่ได้ใช้ในคะแนน</div>` + unused.map(row).join("");
-  box.innerHTML = html;
-  box.querySelectorAll(".arow").forEach(el => {
-    const key = el.dataset.key;
-    el.querySelector("select").onchange = e => {
-      const cur = pillarOf(key);
-      const w = cur ? cur.measures[key] : 1;
-      if (cur) delete cur.measures[key];
-      const target = S.pillars.find(x => x.key === e.target.value);
-      if (target) target.measures[key] = w || 1;
-      renderAdvanced(); renderPillars(); renderPresets(); update();
-    };
-    const r = el.querySelector("input[type=range]");
-    if (r) r.oninput = () => {
-      pillarOf(key).measures[key] = parseFloat(r.value);
-      el.querySelector("output").textContent = r.value;
-      renderNotice();
-      scheduleUpdate();
-    };
-  });
 }
 
 /* ---------- filters ---------- */
@@ -1179,7 +1193,7 @@ $("in-backup").onchange = async e => {
 $("btn-side").onclick = () => $("side").classList.toggle("open");
 
 /* ---------- boot ---------- */
-function renderAll() { renderPresets(); renderPillars(); renderAdvanced(); renderNotice(); update(); }
+function renderAll() { renderPresets(); renderPillars(); renderNotice(); update(); }
 $("sub").textContent = `${DATA.area ? DATA.area + " · " : ""}` +
   (DATA.fetched ? `ข้อมูลรีวิว ณ ${DATA.fetched[0] === DATA.fetched[1] ? DATA.fetched[0] : DATA.fetched[0] + " – " + DATA.fetched[1]}` : `สร้างเมื่อ ${DATA.generated}`);
 setupFilters();
