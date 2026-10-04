@@ -20,6 +20,7 @@ MAP = DATA / "map.html"
 DASHBOARD = DATA / "dashboard.html"
 CACHE = DATA / "cache"
 REVIEW = Path("review") / "keep.csv"  # committed overrides: place_id, keep, note
+SURROUND_ITEMS = DATA / "surroundings_items.json"  # what each OSM / file count is made of (dashboard lists)
 OSM_LOCAL = DATA / "osm" / "features.json"  # from `osm-extract`; used instead of Overpass when present
 
 
@@ -221,17 +222,23 @@ def cmd_enrich(cfg, args):
 
 
 def cmd_surround(cfg, args):
-    from .surround import surround
+    import json
+
+    from .surround import surround, surround_items
 
     markets = load_markets()
     gc = google_client(args, cfg) if cfg["surroundings"]["source"] == "google_aggregate" else None
+    overpass = overpass_client(cfg)
     try:
-        df = surround(cfg, markets, google_client=gc, overpass=overpass_client(cfg))
+        df = surround(cfg, markets, google_client=gc, overpass=overpass)
     finally:
         if gc:
             print(gc.usage_report())
     df.to_csv(SURROUND, index=False, encoding="utf-8-sig")
     print(f"→ {SURROUND} ({len(df.columns) - 1} features)")
+    items = surround_items(cfg, markets, overpass)
+    SURROUND_ITEMS.write_text(json.dumps(items, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"→ {SURROUND_ITEMS} (what each OSM / file count is made of)")
 
 
 def features(cfg):
@@ -290,7 +297,13 @@ def cmd_dashboard(cfg, args):
     df = features(cfg)
     review = pd.read_csv(REVIEW, dtype=str, encoding="utf-8-sig") if REVIEW.exists() else None
     excluded = excluded_markets()
-    DASHBOARD.write_text(render(build_payload(df, cfg, review=review, excluded=excluded)), encoding="utf-8")
+    items = None
+    if SURROUND_ITEMS.exists():
+        import json
+
+        items = json.loads(SURROUND_ITEMS.read_text(encoding="utf-8"))
+    DASHBOARD.write_text(render(build_payload(df, cfg, review=review, excluded=excluded, items=items)),
+                         encoding="utf-8")
     print(f"→ {DASHBOARD} ({len(df)} markets, {len(excluded)} excluded listed) — double-click to open")
 
 

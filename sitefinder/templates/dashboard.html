@@ -196,6 +196,22 @@ td .msub.days { white-space: nowrap; }
 .frow .v { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
 .frow .p { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 .frow .p .bar { height: 5px; }
+details.fx > summary { list-style: none; cursor: pointer; display: block; }
+details.fx > summary::-webkit-details-marker { display: none; }
+details.fx > summary .frow > div:first-child::before { content: "▸"; display: inline-block; width: 14px; color: var(--muted); transition: transform .15s; }
+details.fx[open] > summary .frow > div:first-child::before { transform: rotate(90deg); }
+details.fx > summary:hover .frow > div:first-child { color: var(--accent-ink); }
+details.fx[open] > summary .frow { border-bottom: 0; }
+.items { font-size: 12.5px; padding: 0 0 8px 14px; border-bottom: 1px dashed var(--border); }
+.items ol { margin: 2px 0 4px; padding-left: 22px; max-height: 260px; overflow-y: auto; }
+.items li { padding: 2px 0; }
+.items li > div { display: flex; justify-content: space-between; gap: 10px; }
+.items li a { color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.items li a:hover { color: var(--accent-ink); text-decoration: underline; }
+.items li span { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.items .noname a { color: var(--muted); font-style: italic; }
+.items p { margin: 4px 0; color: var(--text-2); }
+.items .hint { margin: 4px 0 0; }
 .hours { font-size: 13px; color: var(--text-2); padding-left: 18px; margin: 0; }
 textarea { width: 100%; min-height: 70px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--surface); resize: vertical; }
 .linkbtn { display: inline-block; text-decoration: none; color: var(--accent-ink); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; }
@@ -535,6 +551,7 @@ const S = {
              morning: false, evening: false, night: false, unknown: true, short: false, showHidden: false },
   sort: { key: "score", dir: -1 },
   selected: null,
+  openItems: new Set(),  // measure lists left open stay open when you click the next market
 };
 const isDefault = () => JSON.stringify(S.pillars) === JSON.stringify(DATA.pillars);
 const hasData = key => (key === "reviews" || key === "rating")
@@ -920,13 +937,55 @@ function compareText(key, i) {
   return { less, t };
 }
 
+const mapsAt = (lat, lng) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+const ITEM_NOTE = {
+  osm: "จาก OpenStreetMap (แผนที่อาสา) — อาจขาดหรือเกินจากของจริง · คลิกชื่อเพื่อดูตำแหน่ง",
+  campus: "จาก OpenStreetMap — ตึก/คณะที่อยู่ติดกันนับเป็น 1 แห่ง · ระยะ = ถึงขอบพื้นที่ที่ใกล้สุด",
+  area: "พื้นที่ที่ OSM ระบุเป็นเขตอุตสาหกรรม — ส่วนที่ทับกันคิดครั้งเดียวในตัวเลขด้านบน · ระยะ = ถึงขอบพื้นที่",
+};
+
+// what a count is made of, for checking: a list (OSM / your files) or a Google Maps search (Google counts)
+function itemsHtml(key, m) {
+  const f = FEAT[key] || {};
+  if (f.src === "google") {
+    const r = f.radius || 500;
+    const zoom = r <= 500 ? 16 : r <= 1500 ? 14 : 13;
+    const url = `https://www.google.com/maps/search/${encodeURIComponent(f.search)}/@${m.lat},${m.lng},${zoom}z`;
+    return `<div class="items">
+      <p>Google ส่งมาแค่ <b>จำนวน</b> ไม่บอกว่าเป็นที่ไหนบ้าง (ขอรายชื่อต้องเสีย quota ทีละที่)</p>
+      <a class="linkbtn" href="${esc(url)}" target="_blank" rel="noopener">ค้น “${esc(f.search)}” รอบตลาดนี้ใน Google Maps ↗</a>
+      <p class="hint">ผลใน Maps จะไม่ตรงกับตัวเลขเป๊ะ — Maps แสดงทีละราว 20 ที่ และไม่ได้ตัดที่รัศมี ${radLabel(r)}</p></div>`;
+  }
+  if (!f.src || f.src === "google") return null;
+  const list = (m.items || {})[key];
+  if (!list) {
+    return `<div class="items"><p class="hint">${DATA.hasItems ? "ไม่มีรายชื่อสำหรับตัววัดนี้" : "ยังไม่มีรายชื่อ — รัน <code>surround</code> ใหม่ (ไม่เสีย quota) แล้วสร้าง dashboard ใหม่"}</p></div>`;
+  }
+  const isArea = f.src === "area";
+  const rows = list.map(([p, d, extra]) => {
+    const [name, lat, lng] = DATA.places[p];
+    const right = [
+      isArea ? `${fmt(extra * (f.scale || 1), 1)} ${esc(f.unit)}ในรัศมี` : (extra !== undefined ? `${fmt(extra)} ${esc(f.unit)}` : ""),
+      d ? `${fmt(d)} ม.` : (isArea || f.src === "campus" ? "ตลาดอยู่ในพื้นที่" : "0 ม."),
+    ].filter(Boolean).join(" · ");
+    return `<li class="${name ? "" : "noname"}"><div><a href="${esc(mapsAt(lat, lng))}" target="_blank" rel="noopener">${esc(name || "(ไม่มีชื่อในแผนที่)")}</a><span>${right}</span></div></li>`;
+  }).join("");
+  const total = m.f[key];
+  const more = !isArea && f.src !== "file" && isNum(total) && total > list.length
+    ? `<p class="hint">แสดง ${fmt(list.length)} ที่ใกล้สุด จากทั้งหมด ${fmt(total)}</p>` : "";
+  const note = f.src === "file" ? `จากไฟล์ <code>${esc(f.file || "")}</code> ของคุณ` : ITEM_NOTE[f.src] || "";
+  return `<div class="items">${list.length ? `<ol>${rows}</ol>` : `<p>ไม่มีในรัศมีนี้</p>`}${more}<p class="hint">${note}</p></div>`;
+}
+
 function measureRow(key, m, i, w) {
   const c = compareText(key, i);
   const pts = S.res.pctOf(key);
   const used = pts ? pts[i] : null;
-  return `<div class="frow"><div>${esc(FEAT[key]?.label || key)}${radTag(key)}${w ? `<span class="rad" style="color:var(--accent-ink)">น้ำหนัก ${w}</span>` : ""}</div>
+  const row = `<div class="frow"><div>${esc(FEAT[key]?.label || key)}${radTag(key)}${w ? `<span class="rad" style="color:var(--accent-ink)">น้ำหนัก ${w}</span>` : ""}</div>
     <div class="v">${valueText(key, m, i)}</div>
     ${!c ? `<div class="p">ไม่มีข้อมูล — คิดเป็นกลาง ๆ (50%)</div>` : `<div class="p"><div class="bar"><span style="width:${(isNum(used) ? used : c.less) * 100}%"></span></div>${c.t}</div>`}</div>`;
+  const items = itemsHtml(key, m);
+  return items === null ? row : `<details class="fx" data-k="${esc(key)}"${S.openItems.has(key) ? " open" : ""}><summary>${row}</summary>${items}</details>`;
 }
 
 function renderDetail(i) {
@@ -962,6 +1021,7 @@ function renderDetail(i) {
     </div>
 
     <h4>คะแนนมาจากไหน</h4>
+    <p class="hint" style="margin:-4px 0 6px">กด ▸ ที่ตัววัดเพื่อดูว่านับอะไรมาบ้าง</p>
     ${blocks || `<p class="hint">${hidden ? "ซ่อนไว้ จึงไม่ได้คิดคะแนน — กด “เอากลับมา” เพื่อคิดใหม่" : "ยังไม่ได้ให้น้ำหนักหมวดใด"}</p>`}
 
     <h4>บันทึกของคุณ</h4>
@@ -977,6 +1037,9 @@ function renderDetail(i) {
     renderMap();
   };
   $("d-star").onclick = () => toggleStar(i);
+  $("detail").querySelectorAll("details.fx").forEach(d => d.addEventListener("toggle", () => {
+    if (d.open) S.openItems.add(d.dataset.k); else S.openItems.delete(d.dataset.k);
+  }));
   $("d-hide").onclick = () => {
     if (S.hidden[m.id]) delete S.hidden[m.id]; else S.hidden[m.id] = true;
     update();

@@ -653,10 +653,11 @@ def test_campus_count_counts_institutions_not_buildings(tmp_path):
     west = [(1, 13.0 - 0.001, 100.999), (2, 13.0 - 0.001, 101.0), (3, 13.0 + 0.001, 101.0), (4, 13.0 + 0.001, 100.999)]
     east = [(2, 0, 0), (5, 13.0 - 0.001, 101.001), (6, 13.0 + 0.001, 101.001), (3, 0, 0)]
     nodes += [(i, la, lo, {}) for i, la, lo in west] + [(5, 13.0 - 0.001, 101.001, {}), (6, 13.0 + 0.001, 101.001, {})]
-    ways.append((100, [1, 2, 3, 4, 1], {"amenity": "university"}))
-    ways.append((101, [2, 5, 6, 3, 2], {"amenity": "university"}))
+    ways.append((100, [1, 2, 3, 4, 1], {"amenity": "university", "name": "มหาวิทยาลัยบูรพา"}))
+    ways.append((101, [2, 5, 6, 3, 2], {"amenity": "university", "name": "มหาวิทยาลัยบูรพา"}))
     # a node-only college 1 km north, and a node inside the university (a faculty pin) — not double counted
-    nodes += [(7, 13.009, 101.0, {"amenity": "college"}), (8, 13.0, 101.0005, {"amenity": "university"})]
+    nodes += [(7, 13.009, 101.0, {"amenity": "college", "name": "วิทยาลัยเทคนิค"}),
+              (8, 13.0, 101.0005, {"amenity": "university", "name": "คณะวิศวะ"})]
     # a separate campus polygon ~2.2 km east
     far = _square_nodes(20, 13.0, 101.02, 100)
     nodes += [(i, la, lo, {}) for i, la, lo in far]
@@ -675,6 +676,59 @@ def test_campus_count_counts_institutions_not_buildings(tmp_path):
     local = LocalOSM(data)
     assert local.has(["campus"])
     assert local.campus_count(13.0, 101.0, [500, 1500, 3000], "campus") == {500: 1, 1500: 2, 3000: 3}
+
+    # the dashboard lists exactly what was counted: one entry per institution, nearest first
+    items = local.campus_items(13.0, 101.0, [1500, 3000], "campus")
+    assert [(n, d) for n, d, *_ in items[1500]] == [("มหาวิทยาลัยบูรพา", 0), ("วิทยาลัยเทคนิค", 1001)]
+    assert len(items[3000]) == 3 and items[3000][2][0] == "" and 1900 < items[3000][2][1] < 2200
+    name, d, lat, lng = items[3000][2]
+    assert lat == pytest.approx(13.0, abs=0.002) and lng == pytest.approx(101.02, abs=0.002)  # where it is
+
+    # extracts made before names were kept still load (names come back empty)
+    old = {"points": {}, "areas": {}, "campus": {"campus": {"rings": data["campus"]["campus"]["rings"],
+                                                            "nodes": [p[:2] for p in data["campus"]["campus"]["nodes"]]}}}
+    assert LocalOSM(old).campus_count(13.0, 101.0, [3000], "campus") == {3000: 3}
+
+
+def test_surround_items_list_what_was_counted(tmp_path, markets):
+    pytest.importorskip("osmium")
+    from sitefinder.dashboard import build_payload
+    from sitefinder.osm_local import LocalOSM, extract
+    from sitefinder.score import build_features
+    from sitefinder.surround import surround, surround_items
+
+    osm = tmp_path / "t.osm"
+    _write_osm(osm)
+    bbox = {"south": 12.9, "north": 13.1, "west": 100.9, "east": 101.1}
+    points = {"school": ['nwr["amenity"="school"]'], "transit": ['nwr["highway"="bus_stop"]']}
+    areas = {"industrial": ['way["landuse"="industrial"]', 'relation["landuse"="industrial"]']}
+    local = LocalOSM(extract(osm, bbox, points, areas, log=lambda *_: None))
+    pois = tmp_path / "estates.csv"
+    pd.DataFrame({"name": ["นิคมฯ ก", "นิคมฯ ข"], "lat": [13.0, 13.2], "lng": [101.0, 101.2],
+                  "workers": [5000, 9000]}).to_csv(pois, index=False)
+    cfg = {"surroundings": {"source": "google_aggregate", "radii_m": [500, 1500], "google_types": {},
+                            "osm_extra": points, "osm_area": areas},
+           "external_pois": [{"name": "estate_workers", "path": str(pois), "weight": "workers", "radii_m": [3000]}],
+           "scoring": {"pillars": {"p": {"measures": {"school_500": 1}}}}}
+    m = markets.iloc[:1].assign(lat=13.0, lng=101.0)
+    counts = surround(cfg, m, overpass=local, log=lambda *_: None)
+    items = surround_items(cfg, m, local)[m.place_id[0]]
+    for col in ["school_500", "school_1500", "transit_500", "transit_1500"]:
+        assert len(items[col]) == counts[col][0], col             # list length = the count
+    assert all(d <= 500 for _, d, *_ in items["transit_500"])
+    ind = items["industrial_ha_1500"]
+    assert len(ind) == 1 and ind[0][2] == pytest.approx(counts["industrial_ha_1500"][0], rel=0.01)
+    assert [(n, w) for n, _, w, *_ in items["estate_workers_3000"]] == [("นิคมฯ ก", 5000.0)]
+
+    df = build_features(m, pd.DataFrame({"place_id": m.place_id, "reviews": [10], "rating": [4.0]}), counts)
+    payload = build_payload(df, cfg, items={m.place_id[0]: items})
+    f = {x["key"]: x for x in payload["features"]}
+    assert f["school_500"]["src"] == "osm" and f["industrial_ha_1500"]["src"] == "area"
+    assert f["estate_workers_3000"]["src"] == "file"
+    mk = payload["markets"][0]["items"]
+    assert len(mk["school_1500"]) == counts["school_1500"][0]
+    place, dist = mk["estate_workers_3000"][0][:2]
+    assert payload["places"][place][0] == "นิคมฯ ก" and dist == 0
 
 
 def test_hours_need_an_hour_in_the_window_and_record_days():

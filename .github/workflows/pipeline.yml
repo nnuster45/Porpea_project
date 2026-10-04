@@ -63,6 +63,7 @@ jobs:
             data/markets.csv
             data/market_details.csv
             data/surroundings.csv
+            data/surroundings_items.json
           key: sitefinder-data-${{ github.run_id }}
           restore-keys: sitefinder-data-
 
@@ -152,6 +153,7 @@ jobs:
             data/markets.csv
             data/market_details.csv
             data/surroundings.csv
+            data/surroundings_items.json
           key: sitefinder-data-${{ github.run_id }}
 
       - name: Upload results (download from the run page)

@@ -185,6 +185,69 @@ def external_counts(markets, name, pois, radii, weight_col=None):
     return pd.DataFrame(rows)
 
 
+MAX_ITEMS = 50  # per market per column; the dashboard says how many more there are
+
+
+def _external_items(markets, name, pois, radii, weight_col=None):
+    lat, lng = pois["lat"].to_numpy(float), pois["lng"].to_numpy(float)
+    names = pois["name"].fillna("").astype(str).tolist() if "name" in pois.columns else [""] * len(pois)
+    weights = pois[weight_col.lower()].to_numpy(float) if weight_col else None
+    cats = pois["category"].map(_slug).to_numpy() if "category" in pois.columns else None
+    out = {}
+    for m in markets.itertuples(index=False):
+        dist = haversine_m(m.lat, m.lng, lat, lng)
+        order = np.argsort(dist, kind="stable")
+        items = out.setdefault(m.place_id, {})
+        for r in radii:
+            for cat in [None] + ([] if cats is None else list(np.unique(cats))):
+                sel = [i for i in order if dist[i] <= r and (cat is None or cats[i] == cat)]
+                col = f"{name}_{r}" if cat is None else f"{name}_{cat}_{r}"
+                items[col] = [[names[i], int(round(dist[i])),
+                               None if weights is None else float(weights[i]),
+                               round(float(lat[i]), 6), round(float(lng[i]), 6)] for i in sel[:MAX_ITEMS]]
+    return out
+
+
+def surround_items(cfg, markets, overpass=None, log=print):
+    """What each count is made of, so the dashboard can list it for checking:
+    {place_id: {column: [[name, metres, extra, lat, lng], ...]}} (extra = hectares / weight / None).
+
+    Only for sources that say what they counted — the local OSM extract and external files.
+    Google's Aggregate API returns a number only (listing places would cost a Details call each)."""
+    sc = cfg["surroundings"]
+    radii = sc["radii_m"]
+    out = {pid: {} for pid in markets["place_id"]}
+
+    if overpass is not None and hasattr(overpass, "nearby"):
+        points = dict(sc.get("osm_extra") or {})
+        if sc["source"] == "osm":
+            points = {**sc["osm_filters"], **points}
+        campus_radii = sc.get("campus_radii_m", radii)
+        for m in markets.itertuples(index=False):
+            items = out[m.place_id]
+            for feature in points:
+                within = overpass.nearby(m.lat, m.lng, max(radii), feature)
+                for r in radii:
+                    items[f"{feature}_{r}"] = [[n, d, None, a, b] for n, d, a, b in within if d <= r][:MAX_ITEMS]
+            for feature in sc.get("osm_campus") or {}:
+                for r, found in overpass.campus_items(m.lat, m.lng, campus_radii, feature).items():
+                    items[f"{feature}_{r}"] = [[n, d, None, a, b] for n, d, a, b in found][:MAX_ITEMS]
+            for feature in sc.get("osm_area") or {}:
+                for r, found in overpass.area_items(m.lat, m.lng, radii, feature).items():
+                    items[f"{feature}_ha_{r}"] = [[n, d, ha, a, b] for n, ha, d, a, b in found][:MAX_ITEMS]
+    elif sc.get("osm_extra") or sc.get("osm_area") or sc.get("osm_campus"):
+        log("  - OSM item lists need a local extract (`osm-extract`); dashboard will show counts only")
+
+    for ext in cfg.get("external_pois") or []:
+        path = Path(ext["path"])
+        if path.exists():
+            pois = load_pois(path, ext.get("weight"), log=lambda *_: None)
+            found = _external_items(markets, ext["name"], pois, ext.get("radii_m", radii), ext.get("weight"))
+            for pid, cols in found.items():
+                out[pid].update(cols)
+    return out
+
+
 def surround(cfg, markets, google_client=None, overpass=None, log=print):
     sc = cfg["surroundings"]
     radii = sc["radii_m"]
