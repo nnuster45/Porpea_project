@@ -150,8 +150,12 @@ def build_payload(df, cfg):
         "generated": date.today().isoformat(),
         "groups": [{"key": k, "label": v} for k, v in GROUPS],
         "features": features,
-        "personas": sc["personas"],
-        "persona": sc.get("persona", next(iter(sc["personas"]))),
+        "pillars": [
+            {"key": k, "label": p.get("label", k), "tag": p.get("tag", ""), "weight": p.get("weight", 1),
+             "measures": dict(p.get("measures") or {})}
+            for k, p in sc["pillars"].items()
+        ],
+        "profileTopPct": sc.get("profile_top_pct", 30),
         "ratingPrior": sc.get("rating_prior_reviews", 30),
         "topN": cfg.get("output", {}).get("top_n_map", 50),
         "markets": markets,

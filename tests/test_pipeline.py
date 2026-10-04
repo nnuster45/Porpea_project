@@ -223,11 +223,22 @@ def test_end_to_end_score_and_map(markets, tmp_path):
     surround_df = google_counts(markets, fake, {"conv_store": (["convenience_store"], [500])}, log=lambda *_: None)
     surround_df["conv_store_500"] = [1, 2, 3, 4, 5]
     df = build_features(markets, details, surround_df)
-    ranked = score(df, {"reviews": 2, "conv_store_500": 1, "open_evening": 1, "missing_col": 5},
-                   log=lambda *_: None)
+    pillars = {
+        "market": {"label": "ตลาด", "weight": 2, "measures": {"reviews": 1}},
+        "activity": {"label": "คึกคัก", "tag": "ย่านคึกคัก", "weight": 1, "measures": {"conv_store_500": 1, "missing_col": 5}},
+        "residents": {"label": "ที่พัก", "tag": "ย่านที่พัก", "weight": 1, "measures": {"missing_col": 1}},
+    }
+    logs = []
+    ranked = score(df, pillars, profile_top_pct=30, log=logs.append)
     assert ranked["rank"].tolist() == [1, 2, 3, 4, 5]
     assert ranked.iloc[0]["place_id"] == "p_5"  # most reviews + most stores
     assert ranked["score"].between(0, 100).all()
+    assert "pillar_residents" not in ranked and any("residents" in m for m in logs)  # no usable measure → skipped
+    top = ranked.iloc[0]
+    assert top["pillar_market"] == 100 and top["pillar_activity"] == 100 and top["score"] == 100
+    assert top["profile"] == "ย่านคึกคัก" and ranked.iloc[-1]["profile"] == ""
+    assert (ranked["profile"] == "ย่านคึกคัก").sum() == 2  # top 30% of 5 markets = ranks 1–2 (pct ≥ 0.7)
+    assert top["why"].startswith("ตลาด")
     out = tmp_path / "map.html"
     make_map(ranked, top_n=2).save(str(out))
     assert "ตลาด 5" in out.read_text(encoding="utf-8")
@@ -422,3 +433,18 @@ def test_estate_workers_summed_by_weight(markets, tmp_path):
     assert df.loc["p_1", "estate_workers_3000"] == 50000
     assert df.loc["p_3", "estate_workers_3000"] == 50000  # 2.2 km away
     assert df.loc["p_5", "estate_workers_3000"] == 0      # 4.4 km away
+
+
+def test_pillars_stop_double_counting(markets):
+    """Three measures of the same thing inside one pillar weigh no more than one measure elsewhere."""
+    details = pd.DataFrame({"place_id": markets["place_id"], "reviews": [50, 40, 30, 20, 10], "rating": 4.0})
+    surround = pd.DataFrame({"place_id": markets["place_id"],
+                             "conv_store_500": [1, 2, 3, 4, 5], "conv_store_1500": [1, 2, 3, 4, 5], "seven_500": [1, 2, 3, 4, 5]})
+    df = build_features(markets, details, surround)
+    pillars = {
+        "market": {"weight": 1, "measures": {"reviews": 1}},
+        "activity": {"weight": 1, "measures": {"conv_store_500": 1, "conv_store_1500": 1, "seven_500": 1}},
+    }
+    ranked = score(df, pillars, log=lambda *_: None).set_index("place_id")
+    # p_1 is best on reviews, p_5 best on stores: equal pillar weights → a tie, not 3:1 for stores
+    assert ranked.loc["p_1", "score"] == ranked.loc["p_5", "score"]

@@ -88,62 +88,47 @@ external_pois:
     radii_m: [3000]
 
 scoring:
-  # เลือก persona ที่ตรงกับลูกค้าของคุณ (ดูน้ำหนักด้านล่าง) หรือสร้างใหม่ได้
-  persona: general
-  # ความเชื่อมั่นของ rating: ตลาดรีวิวน้อยจะถูกดึงเข้าหาค่าเฉลี่ย
-  rating_prior_reviews: 30
-  personas:
-    general:
-      reviews: 3
-      rating: 1
-      conv_store_500: 2
-      conv_store_1500: 1
-      seven_500: 1
-      supermarket_1500: 1
-      mall_1500: 1
-      apartment_1500: 1
-      workplace_500: 1
-      transit_500: 1
-      open_evening: 1
-      days_open: 1
-    # คนงานโรงงาน: หอพักสำคัญพอ ๆ กับตัวโรงงาน (หลายที่มีรถรับส่งกลับถึงย่านหอ)
-    factory_worker:
-      reviews: 2
-      rating: 1
-      conv_store_1500: 1
-      seven_1500: 1
-      apartment_1500: 3
-      estate_workers_3000: 3
-      industrial_ha_1500: 2
-      open_evening: 3
-      open_night: 1
-      days_open: 1
-    student:
-      reviews: 2
-      rating: 1
-      university_1500: 4
-      apartment_1500: 3
-      conv_store_500: 2
-      open_evening: 2
-      open_night: 2
-    office:
-      reviews: 2
-      rating: 1
-      workplace_500: 4
-      conv_store_500: 2
-      hospital_1500: 1
-      mall_1500: 1
-      transit_500: 2
-      open_morning: 2
-      open_evening: 2
-      days_open: 2
-    tourist:
-      reviews: 4
-      rating: 2
-      lodging_1500: 4
-      mall_1500: 1
-      open_night: 3
-      open_evening: 1
+  # คะแนน = ตลาดเป็นหลัก แล้วดูสิ่งรอบข้าง โดยแบ่งตัววัดเป็น 4 หมวด
+  #   1) แต่ละตัววัด → เทียบกับตลาดอื่นเป็น percentile (0–1)
+  #   2) ในหมวด: เฉลี่ยตัววัดตามน้ำหนักของมัน (measures) → คะแนนหมวด 0–100
+  #   3) รวมหมวดตาม weight ของหมวด → คะแนนรวม 0–100
+  # จัดเป็นหมวดเพื่อกันการนับเรื่องเดียวกันซ้ำ (เช่น ร้านสะดวกซื้อ 500 ม. + 1.5 กม. + 7-11)
+  # เวลาเปิดไม่อยู่ในคะแนน — ใช้เป็นตัวกรองใน dashboard แทน
+  # ปรับได้ทั้งที่นี่ หรือใน dashboard แล้วกด "ส่งออกไป config"
+  rating_prior_reviews: 30   # ตลาดที่รีวิวน้อยกว่าราว ๆ นี้ เรตติ้งจะถูกดึงเข้าหาค่าเฉลี่ย
+  profile_top_pct: 30        # ตลาดที่อยู่ top 30% ของหมวดไหน → ติดป้ายย่านนั้น (เช่น "ย่านที่พัก")
+  pillars:
+    market:
+      label: ตลาดนี้มีคนมาจริงไหม
+      weight: 2              # หลักฐานตรงที่สุด จึงหนักกว่าหมวดอื่น
+      measures:
+        reviews: 2
+        rating: 1
+    activity:
+      label: ย่านนี้คึกคักไหม
+      tag: ย่านคึกคัก
+      weight: 1
+      measures:
+        conv_store_500: 2    # ถ้ามีไฟล์ 7-11 จะใช้ seven_500 แทนตัวนี้ก็ได้ (อย่าใส่ทั้งคู่ — นับซ้ำ)
+        supermarket_1500: 1
+        mall_1500: 1
+        transit_500: 1
+    residents:
+      label: คนพักอาศัยแถวนี้เยอะไหม
+      tag: ย่านที่พัก
+      weight: 1
+      measures:
+        apartment_1500: 2
+        lodging_1500: 1
+        university_1500: 1
+    workers:
+      label: คนทำงานแถวนี้เยอะไหม
+      tag: ย่านที่ทำงาน
+      weight: 1
+      measures:
+        workplace_500: 1
+        industrial_ha_1500: 1
+        estate_workers_3000: 1
 
 output:
   top_n_map: 50

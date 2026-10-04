@@ -10,16 +10,24 @@ import pytest
 from sitefinder.dashboard import TEMPLATE, amphoe, build_payload, describe_feature, market_kind, render
 from sitefinder.score import build_features, score
 
+PILLAR_SETS = {
+    "default_like": {
+        "market": {"label": "ตลาด", "weight": 2, "measures": {"reviews": 2, "rating": 1}},
+        "activity": {"label": "คึกคัก", "tag": "ย่านคึกคัก", "weight": 1, "measures": {"conv_store_500": 2, "seven_ปั๊ม_500": 1}},
+        "workers": {"label": "ทำงาน", "tag": "ย่านที่ทำงาน", "weight": 1.5, "measures": {"industrial_ha_1500": 1}},
+    },
+    # zero weights, a negative measure, a measure with no column, a pillar with nothing usable
+    "edge_cases": {
+        "market": {"label": "ตลาด", "weight": 1, "measures": {"reviews": 1, "rating": 0}},
+        "activity": {"label": "คึกคัก", "weight": 3, "measures": {"conv_store_500": -1, "open_evening": 2, "missing_col": 4}},
+        "residents": {"label": "ที่พัก", "weight": 2, "measures": {"missing_col": 1}},
+        "workers": {"label": "ทำงาน", "weight": 0, "measures": {"industrial_ha_1500": 1}},
+    },
+}
+
 CFG = {
     "area": {"name": "ชลบุรี"},
-    "scoring": {
-        "persona": "p1",
-        "rating_prior_reviews": 30,
-        "personas": {
-            "p1": {"reviews": 3, "rating": 1, "conv_store_500": 2, "industrial_ha_1500": 1.5, "open_evening": 1},
-            "p2": {"reviews": 1, "conv_store_500": -1, "seven_ปั๊ม_500": 2, "missing_col": 4},
-        },
-    },
+    "scoring": {"rating_prior_reviews": 30, "profile_top_pct": 30, "pillars": PILLAR_SETS["default_like"]},
     "output": {"top_n_map": 10},
 }
 
@@ -54,27 +62,33 @@ def features_df():
     return build_features(markets, details, surround, rating_prior_reviews=30)
 
 
-def run_js_scoring(payload, weights, prior):
+def run_js_scoring(payload, prior):
     js = TEMPLATE.read_text(encoding="utf-8")
     code = re.search(r"// <scoring>[^\n]*\n(.*?)// </scoring>", js, re.S).group(1)
     script = code + f"""
 const DATA = {json.dumps(payload, ensure_ascii=False)};
-const res = scoreAll(DATA.markets, {json.dumps(weights, ensure_ascii=False)}, {prior});
-console.log(JSON.stringify(res.scores));
+const res = scorePillars(DATA.markets, DATA.pillars, {prior});
+console.log(JSON.stringify({{scores: res.scores, pillars: Object.fromEntries(res.pillars.map(p => [p.key, p.scores]))}}));
 """
     out = subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True)
     return json.loads(out.stdout)
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
-@pytest.mark.parametrize("persona", ["p1", "p2"])
-def test_browser_scores_match_python(features_df, persona):
-    weights = CFG["scoring"]["personas"][persona]
-    payload = build_payload(features_df, CFG)
-    js_scores = dict(zip([m["id"] for m in payload["markets"]], run_js_scoring(payload, weights, 30)))
-    py = score(features_df, weights, log=lambda *_: None).set_index("place_id")["score"]
-    for pid, s in py.items():
-        assert js_scores[pid] == pytest.approx(s, abs=0.11), pid  # only last-digit rounding may differ
+@pytest.mark.parametrize("pillar_set", list(PILLAR_SETS))
+def test_browser_scores_match_python(features_df, pillar_set):
+    pillars = PILLAR_SETS[pillar_set]
+    cfg = {**CFG, "scoring": {**CFG["scoring"], "pillars": pillars}}
+    payload = build_payload(features_df, cfg)
+    js = run_js_scoring(payload, 30)
+    ids = [m["id"] for m in payload["markets"]]
+    py = score(features_df, pillars, log=lambda *_: None).set_index("place_id")
+    for pid, js_score in zip(ids, js["scores"]):
+        assert js_score == pytest.approx(py.loc[pid, "score"], abs=0.11), pid  # only last-digit rounding may differ
+    assert set(js["pillars"]) == {c[len("pillar_"):] for c in py.columns if c.startswith("pillar_")}
+    for key, vals in js["pillars"].items():
+        for pid, v in zip(ids, vals):
+            assert v * 100 == pytest.approx(py.loc[pid, f"pillar_{key}"], abs=0.051)
 
 
 def test_payload_shape(features_df):
@@ -119,3 +133,11 @@ def test_render_embeds_data_safely(features_df):
     assert "</script><script>alert(1)" not in html
     data = json.loads(re.search(r"const DATA = (.*?);\n", html).group(1).replace("<\\/", "</"))
     assert data["markets"][0]["name"].startswith("ตลาด </script>")
+
+
+def test_pillars_in_payload(features_df):
+    payload = build_payload(features_df, CFG)
+    assert [p["key"] for p in payload["pillars"]] == ["market", "activity", "workers"]
+    assert payload["pillars"][1] == {"key": "activity", "label": "คึกคัก", "tag": "ย่านคึกคัก", "weight": 1,
+                                     "measures": {"conv_store_500": 2, "seven_ปั๊ม_500": 1}}
+    assert payload["profileTopPct"] == 30

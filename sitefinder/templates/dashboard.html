@@ -85,7 +85,7 @@ button.ghost { border-color: transparent; background: transparent; }
 }
 .hint { color: var(--muted); font-size: 12.5px; margin: 0 0 10px; }
 
-/* persona chips */
+/* chips */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip {
   border: 1px solid var(--border); background: var(--surface); border-radius: 999px;
@@ -226,6 +226,41 @@ textarea { width: 100%; min-height: 70px; border: 1px solid var(--border); borde
   .bar { min-width: 36px; }
   .detail { width: 100%; }
 }
+
+/* ---------- pillars ---------- */
+.prow { padding: 8px 0; border-top: 1px solid var(--border); }
+.prow:first-child { border-top: 0; padding-top: 2px; }
+.prow .ph { display: grid; grid-template-columns: 1fr 110px 26px; gap: 8px; align-items: center; }
+.prow .pl { font-weight: 600; font-size: 13.5px; line-height: 1.3; }
+.prow output { text-align: right; font-variant-numeric: tabular-nums; color: var(--accent-ink); font-weight: 600; }
+.prow.off .pl, .prow.off output { color: var(--muted); font-weight: 500; }
+.prow .pm { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+.share { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0 2px; gap: 2px; }
+/* pillar identity = categorical slots 1–4, fixed order */
+:root { --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; }
+.share > span:nth-child(4n+1) { background: var(--c1); }
+.share > span:nth-child(4n+2) { background: var(--c2); }
+.share > span:nth-child(4n+3) { background: var(--c3); }
+.share > span:nth-child(4n+4) { background: var(--c4); }
+.share-l { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11.5px; color: var(--muted); }
+.share-l i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; color: var(--text-2); padding: 4px 0; }
+.arow { display: grid; grid-template-columns: 1fr 104px; gap: 4px 8px; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--border); }
+.arow .al { font-size: 12.5px; line-height: 1.3; }
+.arow select { font-size: 12px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); width: 100%; }
+.arow .aw { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 26px; gap: 8px; align-items: center; }
+.arow .aw output { text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.arow.unused { opacity: .6; }
+.ahead { font-size: 12px; font-weight: 700; color: var(--muted); margin: 12px 0 2px; }
+.minibar { display: flex; align-items: center; gap: 5px; min-width: 64px; }
+.minibar .bar { min-width: 34px; height: 5px; }
+.minibar b { font-weight: 500; font-size: 12px; color: var(--text-2); width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
+.pblock { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
+.pblock .ph { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; font-weight: 600; font-size: 13.5px; }
+.pblock .ph span { font-weight: 500; color: var(--text-2); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.pblock > .bar { margin: 6px 0 4px; height: 7px; }
+.chip .x { margin-left: 6px; opacity: .6; }
+@media (max-width: 860px) { .col-pillar, .col-tags { display: none; } }
 </style>
 </head>
 <body>
@@ -240,25 +275,31 @@ textarea { width: 100%; min-height: 70px; border: 1px solid var(--border); borde
 <div class="layout">
   <aside class="side" id="side">
     <section class="card">
-      <h2><span class="step">1</span>ลูกค้าของคุณเป็นใคร</h2>
-      <p class="hint">เลือกกลุ่ม แล้วระบบจะตั้งน้ำหนักตัววัดให้ ปรับต่อได้ในข้อ 2</p>
-      <div class="chips" id="personas"></div>
-    </section>
-
-    <section class="card">
-      <h2><span class="step">2</span>ให้ความสำคัญกับอะไร</h2>
-      <p class="hint">เลื่อนไปทางขวา = สำคัญมาก · ซ้ายสุด (0) = ไม่นำมาคิด</p>
-      <div id="weights"></div>
+      <h2><span class="step">1</span>ให้ความสำคัญกับอะไร</h2>
+      <p class="hint">ทุกตลาดถูกเทียบกันใน 4 หมวด — เลื่อนไปทางขวา = สำคัญมาก, ซ้ายสุด = ไม่นำมาคิด</p>
+      <div id="presets" class="chips" style="margin-bottom:8px"></div>
+      <div id="pillars"></div>
+      <div class="share" id="share" aria-hidden="true"></div>
+      <div class="share-l" id="share-l"></div>
       <div class="btnrow">
-        <button id="btn-reset">↺ คืนค่ากลุ่มนี้</button>
-        <button id="btn-save">บันทึกเป็นกลุ่มใหม่</button>
+        <button id="btn-reset">↺ ค่าเริ่มต้น</button>
+        <button id="btn-save">บันทึกชุดนี้</button>
         <button id="btn-yaml">ส่งออกไป config</button>
       </div>
     </section>
 
     <section class="card">
-      <h2><span class="step">3</span>กรองตลาด</h2>
+      <details class="adv" id="adv">
+        <summary>ตั้งค่าขั้นสูง: ตัววัดในแต่ละหมวด</summary>
+        <p class="hint" style="margin-top:6px">ย้ายตัววัดเข้า/ออกหมวด และปรับน้ำหนักภายในหมวด — ตัววัดหนึ่งอยู่ได้หมวดเดียว กันการนับซ้ำ</p>
+        <div id="advlist"></div>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">2</span>กรองตลาด</h2>
       <div class="field"><input type="search" id="f-q" placeholder="ค้นหาชื่อตลาด / ที่อยู่"></div>
+      <div class="field"><label class="lbl">ย่าน (ตลาดที่หมวดนั้นติดกลุ่มบน)</label><div class="chips" id="f-profile"></div></div>
       <div class="field"><label class="lbl">ประเภทตลาด</label><div class="chips" id="f-kinds"></div></div>
       <div class="field"><label class="lbl" for="f-amphoe">อำเภอ</label><select id="f-amphoe"></select></div>
       <div class="field">
@@ -266,7 +307,7 @@ textarea { width: 100%; min-height: 70px; border: 1px solid var(--border); borde
         <input type="range" id="f-rev" min="0" max="500" step="10" value="0">
       </div>
       <div class="field">
-        <label class="lbl">ต้องเปิดช่วง</label>
+        <label class="lbl">ต้องเปิดช่วง (ช่วงที่คุณจะไปขาย)</label>
         <div class="checks">
           <label><input type="checkbox" id="f-morning">เช้า</label>
           <label><input type="checkbox" id="f-evening">เย็น</label>
@@ -281,6 +322,10 @@ textarea { width: 100%; min-height: 70px; border: 1px solid var(--border); borde
       <div class="field">
         <label class="lbl" for="o-prior">ความเชื่อเรตติ้ง: ตลาดที่รีวิวน้อยกว่า <b id="o-prior-v"></b> รีวิวจะถูกดึงเข้าหาค่าเฉลี่ย</label>
         <input type="range" id="o-prior" min="1" max="200" step="1">
+      </div>
+      <div class="field">
+        <label class="lbl" for="o-thr">ติดป้ายย่านให้ตลาดที่อยู่ top <b id="o-thr-v"></b>% ของหมวดนั้น</label>
+        <input type="range" id="o-thr" min="5" max="50" step="5">
       </div>
       <div class="field">
         <label class="lbl" for="o-top">ไฮไลต์บนแผนที่ (หมุดใหญ่): <b id="o-top-v"></b> อันดับแรก</label>
@@ -313,16 +358,7 @@ textarea { width: 100%; min-height: 70px; border: 1px solid var(--border); borde
     </div>
     <div class="tablebox" id="tablebox">
       <table>
-        <thead><tr>
-          <th></th>
-          <th class="num">#</th>
-          <th class="sortable" data-sort="name">ตลาด</th>
-          <th class="sortable" data-sort="score">คะแนน</th>
-          <th class="sortable num" data-sort="reviews">รีวิว</th>
-          <th class="sortable num col-rating" data-sort="rating">เรตติ้ง</th>
-          <th class="col-open">เปิด</th>
-          <th class="col-why">จุดเด่น</th>
-        </tr></thead>
+        <thead><tr id="thead-row"></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
@@ -370,42 +406,52 @@ function featureValues(markets, key, prior) {
   return markets.map(m => (m.f[key] === undefined ? null : m.f[key]));
 }
 
-function scoreAll(markets, weights, prior) {
+// percentile per measure → weighted mean inside each pillar → weighted mean of pillars → 0–100
+function scorePillars(markets, pillars, prior) {
+  const cache = {};
+  const pctOf = key => {
+    if (!(key in cache)) {
+      const v = featureValues(markets, key, prior);
+      cache[key] = v.some(x => x !== null && x !== undefined) ? percentiles(v) : null;
+    }
+    return cache[key];
+  };
   const used = [];
-  const pct = {};
-  for (const [key, w] of Object.entries(weights)) {
-    const vals = featureValues(markets, key, prior);
-    if (!vals.some(v => v !== null && v !== undefined)) continue;
-    pct[key] = percentiles(vals);
-    used.push([key, w]);
+  for (const p of pillars) {
+    if (!p.weight) continue;
+    const parts = [];
+    for (const [key, w] of Object.entries(p.measures)) {
+      if (!w) continue;
+      const pct = pctOf(key);
+      if (pct) parts.push({ key, w, pct });
+    }
+    if (!parts.length) continue;
+    const tw = parts.reduce((a, x) => a + Math.abs(x.w), 0);
+    const scores = markets.map((_, i) => parts.reduce((a, x) => a + (x.pct[i] ?? 0.5) * x.w, 0) / tw);
+    used.push({ ...p, parts, tw, scores });
   }
-  const totalW = used.reduce((a, [, w]) => a + Math.abs(w), 0);
-  const scores = markets.map((_, i) => {
-    if (!totalW) return 0;
-    let s = 0;
-    for (const [key, w] of used) s += (pct[key][i] ?? 0.5) * w;
-    return Math.round((s / totalW) * 100 * 10) / 10;
-  });
-  return { scores, pct, used, totalW };
+  const totalW = used.reduce((a, p) => a + Math.abs(p.weight), 0);
+  const scores = markets.map((_, i) =>
+    totalW ? Math.round(used.reduce((a, p) => a + p.scores[i] * p.weight, 0) / totalW * 100 * 10) / 10 : 0);
+  return { scores, pillars: used, totalW, pctOf };
 }
 // </scoring>
 
 /* ================= UI ================= */
-const PERSONA_LABELS = {
-  general: "ลูกค้าทั่วไป", factory_worker: "คนงานโรงงาน", student: "นักศึกษา",
-  office: "พนักงานออฟฟิศ", tourist: "นักท่องเที่ยว",
-};
 const KIND_ORDER = ["ตลาดนัด", "ตลาดเย็น", "ตลาดเช้า", "ตลาดโต้รุ่ง", "ถนนคนเดิน", "ตลาดกลางคืน", "ตลาดทั่วไป"];
+const SHORT = { market: "ตลาด", activity: "คึกคัก", residents: "ที่พัก", workers: "ทำงาน" };
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (v, d = 0) => (v === null || v === undefined || Number.isNaN(v)) ? "–" : Number(v).toLocaleString("th-TH", { maximumFractionDigits: d, minimumFractionDigits: 0 });
 const radLabel = r => r === null || r === undefined ? "" : (r < 1000 ? `${r} ม.` : `${+(r / 1000).toFixed(1)} กม.`);
-const scoreColor = s => s >= 70 ? "var(--s4)" : s >= 55 ? "var(--s3)" : s >= 40 ? "var(--s2)" : "var(--s1)";
 const scoreHex = s => s >= 70 ? "#104281" : s >= 55 ? "#2a78d6" : s >= 40 ? "#6da7ec" : "#b7d3f6";
+const clone = o => JSON.parse(JSON.stringify(o));
 
 const FEAT = Object.fromEntries(DATA.features.map(f => [f.key, f]));
 const MARKETS = DATA.markets;
-const STORE_KEY = "sitefinder:" + (DATA.area || "default");
+const STORE_KEY = "sitefinder:v2:" + (DATA.area || "default");
+const featLabel = key => (FEAT[key]?.label || key) + (FEAT[key]?.radius ? ` ≤ ${radLabel(FEAT[key].radius)}` : "");
+const radTag = key => FEAT[key]?.radius ? `<span class="rad">≤ ${radLabel(FEAT[key].radius)}</span>` : "";
 
 function load() {
   try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
@@ -413,108 +459,144 @@ function load() {
 function save() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
-      shortlist: S.shortlist, notes: S.notes, custom: S.custom, persona: S.persona, weights: S.weights, prior: S.prior, topN: S.topN,
+      shortlist: S.shortlist, notes: S.notes, presets: S.presets, pillars: S.pillars,
+      prior: S.prior, topN: S.topN, topPct: S.thr,
     }));
   } catch (e) { /* storage unavailable — page still works */ }
 }
 
 const saved = load();
 const S = {
-  custom: saved.custom || {},
-  persona: saved.persona || DATA.persona,
-  weights: null,
+  pillars: saved.pillars && saved.pillars.length ? saved.pillars : clone(DATA.pillars),
+  presets: saved.presets || {},
   prior: saved.prior ?? DATA.ratingPrior,
   topN: saved.topN ?? DATA.topN,
+  thr: saved.topPct ?? DATA.profileTopPct,
   shortlist: saved.shortlist || {},
   notes: saved.notes || {},
-  filters: { q: "", kinds: new Set(), amphoe: "", minReviews: 0, morning: false, evening: false, night: false, short: false },
+  filters: { q: "", kinds: new Set(), profiles: new Set(), amphoe: "", minReviews: 0, morning: false, evening: false, night: false, short: false },
   sort: { key: "score", dir: -1 },
   selected: null,
-  res: null,
-  modified: false,
 };
-const allPersonas = () => ({ ...DATA.personas, ...S.custom });
-function personaWeights(name) {
-  const base = Object.fromEntries(DATA.features.map(f => [f.key, 0]));
-  return { ...base, ...(allPersonas()[name] || {}) };
-}
-if (!allPersonas()[S.persona]) S.persona = DATA.persona;
-S.weights = saved.weights ? { ...personaWeights(S.persona), ...saved.weights } : personaWeights(S.persona);
-S.modified = !!saved.weights && JSON.stringify(saved.weights) !== JSON.stringify(personaWeights(S.persona));
+const isDefault = () => JSON.stringify(S.pillars) === JSON.stringify(DATA.pillars);
+const hasData = key => (key === "reviews" || key === "rating")
+  ? MARKETS.some(m => m[key] !== null && m[key] !== undefined)
+  : MARKETS.some(m => m.f[key] !== null && m.f[key] !== undefined);
+const pillarOf = key => S.pillars.find(p => key in p.measures);
 
-/* ---------- personas ---------- */
-function renderPersonas() {
-  const box = $("personas");
-  box.innerHTML = "";
-  for (const name of Object.keys(allPersonas())) {
+/* ---------- pillars panel ---------- */
+function renderPresets() {
+  const box = $("presets");
+  const names = Object.keys(S.presets);
+  box.innerHTML = names.length ? `<span class="hint" style="margin:0 4px 0 0;align-self:center">ชุดที่บันทึก:</span>` : "";
+  for (const name of names) {
     const b = document.createElement("button");
-    b.className = "chip" + (S.custom[name] ? " custom" : "");
-    b.textContent = (PERSONA_LABELS[name] || name) + (name === S.persona && S.modified ? " (ปรับแล้ว)" : "");
-    b.setAttribute("aria-pressed", name === S.persona);
-    b.onclick = () => { S.persona = name; S.weights = personaWeights(name); S.modified = false; renderPersonas(); renderWeights(); update(); };
+    b.className = "chip custom";
+    b.setAttribute("aria-pressed", JSON.stringify(S.presets[name]) === JSON.stringify(S.pillars));
+    b.innerHTML = `${esc(name)}<span class="x" title="ลบ">✕</span>`;
+    b.onclick = e => {
+      if (e.target.classList.contains("x")) { delete S.presets[name]; renderPresets(); save(); return; }
+      S.pillars = clone(S.presets[name]); renderAll();
+    };
     box.appendChild(b);
   }
 }
 
-/* ---------- weights ---------- */
-function hasData(key) {
-  if (key === "reviews" || key === "rating") return MARKETS.some(m => m[key] !== null && m[key] !== undefined);
-  return MARKETS.some(m => m.f[key] !== null && m.f[key] !== undefined);
+function measureSummary(p) {
+  const items = Object.entries(p.measures).filter(([k, w]) => w && hasData(k)).map(([k]) => esc(featLabel(k)));
+  const missing = Object.entries(p.measures).filter(([k, w]) => w && !hasData(k)).map(([k]) => esc(featLabel(k)));
+  return (items.length ? items.join(" · ") : "ยังไม่มีตัววัด") + (missing.length ? `<br><span style="opacity:.75">ไม่มีข้อมูล: ${missing.join(" · ")}</span>` : "");
 }
-function renderWeights() {
-  const box = $("weights");
+
+function renderPillars() {
+  const box = $("pillars");
   box.innerHTML = "";
-  for (const g of DATA.groups) {
-    const feats = DATA.features.filter(f => f.group === g.key);
-    if (!feats.length) continue;
-    const active = feats.filter(f => S.weights[f.key]).length;
-    const det = document.createElement("details");
-    det.className = "group";
-    det.open = active > 0;
-    det.innerHTML = `<summary>${esc(g.label)}<span class="count">${active ? `ใช้อยู่ ${active}` : "ไม่ได้ใช้"}</span></summary>`;
-    for (const f of feats) {
-      const ok = hasData(f.key);
-      const w = S.weights[f.key] || 0;
-      const row = document.createElement("div");
-      row.className = "wrow" + (w ? " on" : "") + (ok ? "" : " nodata");
-      const id = "w-" + f.key;
-      row.innerHTML = `<label class="wl" for="${esc(id)}">${esc(f.label)}${f.radius ? `<span class="rad">≤ ${radLabel(f.radius)}</span>` : ""}${ok ? "" : `<span class="rad">ไม่มีข้อมูล</span>`}</label>
-        <input type="range" id="${esc(id)}" min="${Math.min(0, w)}" max="${Math.max(5, w)}" step="0.5" value="${w}" ${ok ? "" : "disabled"}>
-        <output>${w}</output>`;
-      const input = row.querySelector("input");
-      input.oninput = () => {
-        const v = parseFloat(input.value);
-        S.weights[f.key] = v;
-        row.querySelector("output").textContent = v;
-        row.classList.toggle("on", v !== 0);
-        const n = feats.filter(x => S.weights[x.key]).length;
-        det.querySelector(".count").textContent = n ? `ใช้อยู่ ${n}` : "ไม่ได้ใช้";
-        if (!S.modified) { S.modified = true; renderPersonas(); }
-        scheduleUpdate();
-      };
-      det.appendChild(row);
-    }
-    box.appendChild(det);
+  for (const p of S.pillars) {
+    const row = document.createElement("div");
+    row.className = "prow" + (p.weight ? "" : " off");
+    const id = "p-" + p.key;
+    row.innerHTML = `<div class="ph"><label class="pl" for="${esc(id)}">${esc(p.label)}</label>
+        <input type="range" id="${esc(id)}" min="0" max="5" step="0.5" value="${p.weight}"><output>${p.weight}</output></div>
+      <div class="pm">${measureSummary(p)}</div>`;
+    const input = row.querySelector("input");
+    input.oninput = () => {
+      p.weight = parseFloat(input.value);
+      row.querySelector("output").textContent = p.weight;
+      row.classList.toggle("off", !p.weight);
+      renderShare(); renderPresets();
+      scheduleUpdate();
+    };
+    box.appendChild(row);
   }
+  renderShare();
+}
+
+function renderShare() {
+  const tot = S.pillars.reduce((a, p) => a + Math.abs(p.weight), 0) || 1;
+  $("share").innerHTML = S.pillars.map(p => `<span style="flex:${Math.abs(p.weight)}"></span>`).join("");
+  const colors = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)"];
+  $("share-l").innerHTML = S.pillars.map((p, i) =>
+    `<span><i style="background:${colors[i % 4]}"></i>${esc(SHORT[p.key] || p.label)} ${Math.round(Math.abs(p.weight) / tot * 100)}%</span>`).join("");
+}
+
+function renderAdvanced() {
+  const box = $("advlist");
+  const opts = p => `<option value="">— ไม่ใช้ —</option>` + S.pillars.map(x =>
+    `<option value="${esc(x.key)}" ${p && p.key === x.key ? "selected" : ""}>${esc(SHORT[x.key] || x.label)}</option>`).join("");
+  const row = key => {
+    const p = pillarOf(key);
+    const w = p ? p.measures[key] : 0;
+    const ok = hasData(key);
+    return `<div class="arow ${p ? "" : "unused"}" data-key="${esc(key)}">
+      <div class="al">${esc(FEAT[key]?.label || key)}${radTag(key)}${ok ? "" : `<span class="rad">ไม่มีข้อมูล</span>`}</div>
+      <select aria-label="หมวด">${opts(p)}</select>
+      ${p ? `<div class="aw"><input type="range" min="0" max="5" step="0.5" value="${w}" aria-label="น้ำหนักในหมวด"><output>${w}</output></div>` : ""}
+    </div>`;
+  };
+  let html = "";
+  for (const p of S.pillars) {
+    const keys = Object.keys(p.measures);
+    html += `<div class="ahead">${esc(p.label)}</div>` + (keys.length ? keys.map(row).join("") : `<div class="hint">ยังไม่มีตัววัด</div>`);
+  }
+  const unused = DATA.features.map(f => f.key).filter(k => !pillarOf(k));
+  if (unused.length) html += `<div class="ahead">ไม่ได้ใช้ในคะแนน</div>` + unused.map(row).join("");
+  box.innerHTML = html;
+  box.querySelectorAll(".arow").forEach(el => {
+    const key = el.dataset.key;
+    el.querySelector("select").onchange = e => {
+      const cur = pillarOf(key);
+      const w = cur ? cur.measures[key] : 1;
+      if (cur) delete cur.measures[key];
+      const target = S.pillars.find(x => x.key === e.target.value);
+      if (target) target.measures[key] = w || 1;
+      renderAdvanced(); renderPillars(); renderPresets(); update();
+    };
+    const r = el.querySelector("input[type=range]");
+    if (r) r.oninput = () => {
+      pillarOf(key).measures[key] = parseFloat(r.value);
+      el.querySelector("output").textContent = r.value;
+      scheduleUpdate();
+    };
+  });
 }
 
 /* ---------- filters ---------- */
-function setupFilters() {
-  const kinds = KIND_ORDER.filter(k => MARKETS.some(m => m.kind === k));
-  const kbox = $("f-kinds");
-  for (const k of kinds) {
-    const n = MARKETS.filter(m => m.kind === k).length;
+function chipFilter(boxId, values, set, label) {
+  const box = $(boxId);
+  box.innerHTML = "";
+  for (const [v, n] of values) {
     const b = document.createElement("button");
     b.className = "chip";
-    b.textContent = `${k} ${n}`;
-    b.setAttribute("aria-pressed", "false");
-    b.onclick = () => {
-      S.filters.kinds.has(k) ? S.filters.kinds.delete(k) : S.filters.kinds.add(k);
-      b.setAttribute("aria-pressed", S.filters.kinds.has(k));
-      update();
-    };
-    kbox.appendChild(b);
+    b.textContent = n === undefined ? label(v) : `${label(v)} ${n}`;
+    b.setAttribute("aria-pressed", set.has(v));
+    b.onclick = () => { set.has(v) ? set.delete(v) : set.add(v); b.setAttribute("aria-pressed", set.has(v)); update(); };
+    box.appendChild(b);
   }
+}
+
+function setupFilters() {
+  chipFilter("f-kinds", KIND_ORDER.filter(k => MARKETS.some(m => m.kind === k)).map(k => [k, MARKETS.filter(m => m.kind === k).length]), S.filters.kinds, k => k);
+  chipFilter("f-profile", DATA.pillars.filter(p => p.tag).map(p => [p.tag]), S.filters.profiles, t => t);
   const counts = {};
   MARKETS.forEach(m => { counts[m.amphoe] = (counts[m.amphoe] || 0) + 1; });
   const sel = $("f-amphoe");
@@ -529,18 +611,25 @@ function setupFilters() {
   for (const k of ["morning", "evening", "night"]) $("f-" + k).onchange = e => { S.filters[k] = e.target.checked; update(); };
   $("f-short").onchange = e => { S.filters.short = e.target.checked; update(); };
 
-  const prior = $("o-prior");
-  prior.value = S.prior; $("o-prior-v").textContent = S.prior;
-  prior.oninput = () => { S.prior = +prior.value; $("o-prior-v").textContent = S.prior; scheduleUpdate(); };
-  const top = $("o-top");
-  top.value = S.topN; $("o-top-v").textContent = S.topN;
-  top.oninput = () => { S.topN = +top.value; $("o-top-v").textContent = S.topN; scheduleUpdate(); };
+  const bind = (id, key) => {
+    const el = $(id);
+    el.value = S[key]; $(id + "-v").textContent = S[key];
+    el.oninput = () => { S[key] = +el.value; $(id + "-v").textContent = S[key]; scheduleUpdate(); };
+  };
+  bind("o-prior", "prior"); bind("o-top", "topN"); bind("o-thr", "thr");
 }
 
-function passes(m) {
+// a market gets a pillar's tag when it is in the top S.thr % of markets for that pillar
+function profiles(i) {
+  if (!S.res.ranks) S.res.ranks = Object.fromEntries(S.res.pillars.map(p => [p.key, percentiles(p.scores)]));
+  return S.res.pillars.filter(p => p.tag && S.res.ranks[p.key][i] >= 1 - S.thr / 100).map(p => p.tag);
+}
+
+function passes(m, i) {
   const F = S.filters;
   if (F.q && !(m.name + " " + m.address).toLowerCase().includes(F.q)) return false;
   if (F.kinds.size && !F.kinds.has(m.kind)) return false;
+  if (F.profiles.size && !profiles(i).some(t => F.profiles.has(t))) return false;
   if (F.amphoe && m.amphoe !== F.amphoe) return false;
   if ((m.reviews || 0) < F.minReviews) return false;
   if (F.morning && !(m.f.open_morning > 0)) return false;
@@ -558,27 +647,17 @@ function scheduleUpdate() {
   requestAnimationFrame(() => { pending = false; update(); });
 }
 
-function highlights(i, n = 3) {
-  const out = [];
-  for (const [key, w] of S.res.used) {
-    if (w <= 0) continue;
-    const p = S.res.pct[key][i];
-    if (p === null || p === undefined || p < 0.6) continue;
-    out.push({ key, p, c: p * w });
-  }
-  return out.sort((a, b) => b.c - a.c).slice(0, n);
-}
-
 function update() {
-  S.res = scoreAll(MARKETS, S.weights, S.prior);
+  S.res = scorePillars(MARKETS, S.pillars, S.prior);
   const order = MARKETS.map((m, i) => i).sort((a, b) => S.res.scores[b] - S.res.scores[a]);
   S.rank = new Array(MARKETS.length);
   order.forEach((i, r) => { S.rank[i] = r + 1; });
 
-  let rows = MARKETS.map((m, i) => i).filter(i => passes(MARKETS[i]));
-  const k = S.sort.key, d = S.sort.dir;
+  const rows = MARKETS.map((m, i) => i).filter(i => passes(MARKETS[i], i));
+  const { key: k, dir: d } = S.sort;
+  const pill = S.res.pillars.find(p => "p_" + p.key === k);
   const val = i => k === "score" ? S.res.scores[i] : k === "name" ? MARKETS[i].name
-    : k === "rating" ? (MARKETS[i].rating ?? -1) : (MARKETS[i].reviews ?? -1);
+    : pill ? pill.scores[i] : k === "rating" ? (MARKETS[i].rating ?? -1) : (MARKETS[i].reviews ?? -1);
   rows.sort((a, b) => {
     const va = val(a), vb = val(b);
     return (typeof va === "string" ? va.localeCompare(vb, "th") : va - vb) * d;
@@ -602,34 +681,48 @@ function openTags(m) {
   if (m.f.open_evening > 0) t.push("เย็น");
   if (m.f.open_night > 0) t.push("ดึก");
   if (days === null || days === undefined) return `<span class="msub">ไม่ทราบเวลา</span>`;
-  const d = Math.round(days * 7);
-  return t.map(x => `<span class="tag">${x}</span>`).join("") + `<span class="msub days"> ${d === 7 ? "ทุกวัน" : d + " วัน/สัปดาห์"}</span>`;
+  const n = Math.round(days * 7);
+  return t.map(x => `<span class="tag">${x}</span>`).join("") + `<span class="msub days"> ${n === 7 ? "ทุกวัน" : n + " วัน/สัปดาห์"}</span>`;
+}
+
+function renderHead() {
+  const th = (key, label, cls = "") => `<th class="sortable ${cls}" data-sort="${key}">${label}${S.sort.key === key ? ` <span class="arrow">${S.sort.dir < 0 ? "▼" : "▲"}</span>` : ""}</th>`;
+  $("thead-row").innerHTML = `<th></th><th class="num">#</th>${th("name", "ตลาด")}${th("score", "คะแนน")}` +
+    S.res.pillars.map(p => th("p_" + p.key, esc(SHORT[p.key] || p.label), "col-pillar")).join("") +
+    `${th("reviews", "รีวิว", "num")}<th class="col-open">เปิด</th><th class="col-tags">ย่าน</th>`;
+  document.querySelectorAll("#thead-row th.sortable").forEach(el => el.onclick = () => {
+    const key = el.dataset.sort;
+    S.sort = { key, dir: S.sort.key === key ? -S.sort.dir : (key === "name" ? 1 : -1) };
+    update();
+  });
 }
 
 function renderTable() {
+  renderHead();
   const tb = $("tbody");
+  const cols = 7 + S.res.pillars.length;
   if (!S.rows.length) {
-    tb.innerHTML = `<tr><td colspan="8" class="empty">ไม่มีตลาดที่ตรงเงื่อนไข — ลองลดตัวกรองในข้อ 3</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="${cols}" class="empty">ไม่มีตลาดที่ตรงเงื่อนไข — ลองลดตัวกรองในข้อ 2</td></tr>`;
     return;
   }
   tb.innerHTML = S.rows.map(i => {
     const m = MARKETS[i], s = S.res.scores[i];
-    const hl = highlights(i).map(h => `<span class="tag on">${esc(FEAT[h.key]?.label || h.key)}</span>`).join("");
+    const tags = profiles(i).map(t => `<span class="tag on">${esc(t)}</span>`).join("");
+    const pcells = S.res.pillars.map(p => {
+      const v = p.scores[i] * 100;
+      return `<td class="col-pillar" title="${esc(p.label)}: ${fmt(v)}"><div class="minibar"><b>${fmt(v)}</b><div class="bar"><span style="width:${Math.max(0, Math.min(100, v))}%"></span></div></div></td>`;
+    }).join("");
     return `<tr data-i="${i}" class="${S.selected === i ? "sel" : ""}">
       <td><button class="star" data-star="${i}" aria-pressed="${!!S.shortlist[m.id]}" aria-label="ติดดาว">${S.shortlist[m.id] ? "★" : "☆"}</button></td>
       <td class="rank num">${S.rank[i]}</td>
-      <td><div class="mname">${esc(m.name)}</div><div class="msub">${esc(m.kind)} · ${esc(m.amphoe)}</div></td>
+      <td><div class="mname">${esc(m.name)}</div><div class="msub">${esc(m.kind)} · ${esc(m.amphoe)}${m.rating ? ` · ★ ${Number(m.rating).toFixed(1)}` : ""}</div></td>
       <td><div class="scorecell"><b>${fmt(s, 1)}</b><div class="bar"><span style="width:${Math.max(0, Math.min(100, s))}%"></span></div></div></td>
+      ${pcells}
       <td class="num">${fmt(m.reviews)}</td>
-      <td class="num col-rating">${m.rating ? "★ " + Number(m.rating).toFixed(1) : "–"}</td>
       <td class="col-open">${openTags(m)}</td>
-      <td class="col-why">${hl || `<span class="msub">–</span>`}</td>
+      <td class="col-tags">${tags || `<span class="msub">–</span>`}</td>
     </tr>`;
   }).join("");
-  document.querySelectorAll("thead th.sortable").forEach(th => {
-    th.querySelector(".arrow")?.remove();
-    if (th.dataset.sort === S.sort.key) th.insertAdjacentHTML("beforeend", ` <span class="arrow">${S.sort.dir < 0 ? "▼" : "▲"}</span>`);
-  });
 }
 
 $("tbody").addEventListener("click", e => {
@@ -638,11 +731,6 @@ $("tbody").addEventListener("click", e => {
   const tr = e.target.closest("tr[data-i]");
   if (tr) select(+tr.dataset.i, true);
 });
-document.querySelectorAll("thead th.sortable").forEach(th => th.addEventListener("click", () => {
-  const key = th.dataset.sort;
-  S.sort = { key, dir: S.sort.key === key ? -S.sort.dir : (key === "name" ? 1 : -1) };
-  update();
-}));
 
 function toggleStar(i) {
   const id = MARKETS[i].id;
@@ -681,10 +769,9 @@ function renderMap() {
     if (!mk) continue;
     if (!visible.has(i)) { if (map.hasLayer(mk)) map.removeLayer(mk); continue; }
     const s = S.res.scores[i];
-    const top = S.rank[i] <= S.topN;
     const sel = S.selected === i;
     mk.setStyle({
-      fillColor: scoreHex(s), radius: sel ? 11 : top ? 8 : 5,
+      fillColor: scoreHex(s), radius: sel ? 11 : S.rank[i] <= S.topN ? 8 : 5,
       color: sel ? "#0b0b0b" : "#ffffff", weight: sel ? 3 : 1.5,
     });
     mk.unbindTooltip().bindTooltip(`<b>#${S.rank[i]} ${esc(MARKETS[i].name)}</b><br>คะแนน ${fmt(s, 1)}`, { direction: "top", offset: [0, -6] });
@@ -707,60 +794,61 @@ function select(i, fromTable) {
   if (map && m.lat !== null) map.panTo([m.lat, m.lng]);
 }
 
-function featureValueText(f, m) {
-  const raw = f.key === "reviews" ? m.reviews : f.key === "rating" ? null : m.f[f.key];
-  if (f.key === "rating") {
-    const adj = ratingAdj(MARKETS, S.prior)[MARKETS.indexOf(m)];
-    return m.rating ? `${fmt(m.rating, 1)} → ${fmt(adj, 2)}` : "–";
+function valueText(key, m, i) {
+  const f = FEAT[key] || { scale: 1, unit: "" };
+  if (key === "rating") {
+    const adj = ratingAdj(MARKETS, S.prior)[i];
+    return m.rating ? `${Number(m.rating).toFixed(1)} → ${fmt(adj, 2)}` : "–";
   }
+  const raw = key === "reviews" ? m.reviews : m.f[key];
   if (raw === null || raw === undefined) return "–";
   const v = raw * (f.scale || 1);
   return `${fmt(v, v < 10 && f.scale !== 1 ? 1 : 0)} ${esc(f.unit || "")}`;
 }
 
+function measureRow(key, m, i, w) {
+  const pct = S.res.pctOf(key);
+  const p = pct ? pct[i] : null;
+  return `<div class="frow"><div>${esc(FEAT[key]?.label || key)}${radTag(key)}${w ? `<span class="rad" style="color:var(--accent-ink)">น้ำหนัก ${w}</span>` : ""}</div>
+    <div class="v">${valueText(key, m, i)}</div>
+    ${p === null || p === undefined ? `<div class="p">ไม่มีข้อมูล — นับเป็นกลาง ๆ (50%)</div>` : `<div class="p"><div class="bar"><span style="width:${p * 100}%"></span></div>มากกว่า ${Math.round(p * 100)}% ของตลาด</div>`}</div>`;
+}
+
 function renderDetail(i) {
   const m = MARKETS[i], s = S.res.scores[i];
-  const contrib = S.res.used.filter(([, w]) => w !== 0).map(([key, w]) => {
-    const p = S.res.pct[key][i] ?? 0.5;
-    const max = Math.abs(w) / S.res.totalW * 100;
-    return { key, w, p, pts: p * w / S.res.totalW * 100, max };
-  }).sort((a, b) => b.max - a.max);
-
-  const groups = DATA.groups.map(g => {
-    const rows = DATA.features.filter(f => f.group === g.key && hasData(f.key)).map(f => {
-      const p = S.res.pct[f.key]?.[i] ?? percentiles(featureValues(MARKETS, f.key, S.prior))[i];
-      const w = S.weights[f.key] || 0;
-      return `<div class="frow"><div>${esc(f.label)}${f.radius ? `<span class="rad">≤ ${radLabel(f.radius)}</span>` : ""}${w ? `<span class="rad" style="color:var(--accent-ink)">น้ำหนัก ${w}</span>` : ""}</div>
-        <div class="v">${featureValueText(f, m)}</div>
-        ${p === null || p === undefined ? "" : `<div class="p"><div class="bar"><span style="width:${p * 100}%"></span></div>มากกว่า ${Math.round(p * 100)}% ของตลาด</div>`}</div>`;
-    }).join("");
-    return rows ? `<h4>${esc(g.label)}</h4>${rows}` : "";
+  const blocks = S.res.pillars.map(p => {
+    const v = p.scores[i] * 100;
+    const pts = p.scores[i] * p.weight / S.res.totalW * 100;
+    const max = Math.abs(p.weight) / S.res.totalW * 100;
+    return `<div class="pblock"><div class="ph">${esc(p.label)}<span>${fmt(v)} / 100 → ได้ ${fmt(pts, 1)} จาก ${fmt(max, 1)} คะแนน</span></div>
+      <div class="bar"><span style="width:${Math.max(0, Math.min(100, v))}%"></span></div>
+      ${p.parts.map(x => measureRow(x.key, m, i, x.w)).join("")}</div>`;
   }).join("");
-
+  const usedKeys = new Set(S.res.pillars.flatMap(p => p.parts.map(x => x.key)));
+  const others = DATA.features.filter(f => !usedKeys.has(f.key) && hasData(f.key)).map(f => measureRow(f.key, m, i, 0)).join("");
   const hours = (m.hours || "").split("|").map(x => x.trim()).filter(Boolean);
+  const tags = profiles(i).map(t => `<span class="tag on">${esc(t)}</span>`).join("");
+
   $("detail").innerHTML = `
     <button class="ghost close" id="d-close" aria-label="ปิด">✕</button>
     <div class="msub">${esc(m.kind)} · อ.${esc(m.amphoe)}</div>
     <h3>${esc(m.name)}</h3>
     <div class="msub">${esc(m.address)}</div>
     <div class="bigscore"><b style="color:${s >= 55 ? "var(--accent-ink)" : "var(--text)"}">${fmt(s, 1)}</b><span>คะแนน · อันดับ ${S.rank[i]} จาก ${MARKETS.length}</span></div>
+    ${tags ? `<div>${tags}</div>` : ""}
     <div class="btnrow">
       <button class="star" id="d-star" aria-pressed="${!!S.shortlist[m.id]}" style="border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:14px">${S.shortlist[m.id] ? "★ ติดดาวแล้ว" : "☆ ติดดาวไว้ลงพื้นที่"}</button>
       ${m.url ? `<a class="linkbtn" href="${esc(m.url)}" target="_blank" rel="noopener">เปิดใน Google Maps ↗</a>` : ""}
     </div>
 
     <h4>คะแนนมาจากไหน</h4>
-    ${contrib.length ? `<div class="contrib">${contrib.map(c => `
-      <div>${esc(FEAT[c.key]?.label || c.key)}${FEAT[c.key]?.radius ? `<span class="rad">≤ ${radLabel(FEAT[c.key].radius)}</span>` : ""}</div>
-      <div class="bar" title="ได้ ${fmt(c.pts, 1)} จากเต็ม ${fmt(c.max, 1)}"><span style="width:${c.max ? Math.max(0, c.pts) / c.max * 100 : 0}%"></span></div>
-      <div class="pts">${fmt(c.pts, 1)} / ${fmt(c.max, 1)}</div>`).join("")}</div>
-      <p class="hint" style="margin-top:6px">แต่ละแถว = คะแนนที่ได้ / คะแนนเต็มของตัววัดนั้น (ตามน้ำหนักที่ตั้งไว้)</p>` : `<p class="hint">ยังไม่ได้ตั้งน้ำหนักตัววัดใด</p>`}
+    ${blocks || `<p class="hint">ยังไม่ได้ให้น้ำหนักหมวดใด</p>`}
 
     <h4>บันทึกของคุณ</h4>
     <textarea id="d-note" placeholder="เช่น ไปดูวันเสาร์ คนเยอะช่วง 18:00, ค่าแผง 150 บาท/วัน">${esc(S.notes[m.id] || "")}</textarea>
 
     ${hours.length ? `<h4>เวลาเปิด</h4><ul class="hours">${hours.map(h => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
-    ${groups}
+    ${others ? `<details style="margin-top:14px"><summary class="msub" style="cursor:pointer">ข้อมูลอื่นที่ไม่ได้ใช้ในคะแนน</summary>${others}</details>` : ""}
   `;
   $("d-close").onclick = () => {
     $("detail").classList.remove("open");
@@ -777,23 +865,28 @@ function renderDetail(i) {
 }
 
 /* ---------- modal / exports ---------- */
-function modal(html) {
-  $("modal-box").innerHTML = html;
-  $("modal").hidden = false;
-}
+function modal(html) { $("modal-box").innerHTML = html; $("modal").hidden = false; }
 $("modal").addEventListener("click", e => { if (e.target.id === "modal" || e.target.dataset.close !== undefined) $("modal").hidden = true; });
-document.addEventListener("keydown", e => { if (e.key === "Escape") { $("modal").hidden = true; } });
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("modal").hidden = true; });
 
-function weightsYaml(name) {
-  const lines = Object.entries(S.weights).filter(([, w]) => w).map(([k, w]) => `      ${k}: ${w}`);
-  return `    ${name}:\n${lines.join("\n")}`;
+const yq = s => /^[\w-]+$/.test(s) ? s : JSON.stringify(s);
+function pillarsYaml() {
+  const out = ["  pillars:"];
+  for (const p of S.pillars) {
+    out.push(`    ${p.key}:`, `      label: ${yq(p.label)}`);
+    if (p.tag) out.push(`      tag: ${yq(p.tag)}`);
+    out.push(`      weight: ${p.weight}`, "      measures:");
+    const ms = Object.entries(p.measures);
+    if (!ms.length) out[out.length - 1] = "      measures: {}";
+    for (const [k, w] of ms) out.push(`        ${yq(k)}: ${w}`);
+  }
+  return out.join("\n");
 }
 
 $("btn-yaml").onclick = () => {
-  const name = S.modified ? S.persona + "_custom" : S.persona;
   modal(`<h3>ส่งออกน้ำหนักไปใส่ config.yaml</h3>
-    <p class="hint">คัดลอกแล้ววางใต้ <code>scoring: → personas:</code> ใน config.yaml เพื่อให้คำสั่ง <code>score</code> ใช้น้ำหนักชุดเดียวกัน</p>
-    <pre id="yaml">${esc(weightsYaml(name))}</pre>
+    <p class="hint">แทนที่ส่วน <code>pillars:</code> ใต้ <code>scoring:</code> ใน config.yaml เพื่อให้คำสั่ง <code>score</code> และ dashboard รอบหน้าใช้ค่านี้</p>
+    <pre id="yaml">${esc(pillarsYaml())}</pre>
     <div class="btnrow"><button class="primary" id="copy">คัดลอก</button><button data-close>ปิด</button></div>`);
   $("copy").onclick = async () => {
     try { await navigator.clipboard.writeText($("yaml").textContent); $("copy").textContent = "คัดลอกแล้ว ✓"; }
@@ -802,39 +895,40 @@ $("btn-yaml").onclick = () => {
 };
 
 $("btn-save").onclick = () => {
-  modal(`<h3>บันทึกเป็นกลุ่มลูกค้าใหม่</h3>
-    <p class="hint">เก็บไว้ในเบราว์เซอร์นี้ — ถ้าจะใช้กับคำสั่ง score ให้กด “ส่งออกไป config” ด้วย</p>
-    <input type="text" id="pname" placeholder="ชื่อ เช่น แม่ค้าขนมหน้านิคม">
+  modal(`<h3>บันทึกชุดน้ำหนักนี้</h3>
+    <p class="hint">เก็บไว้ในเบราว์เซอร์นี้ กดเรียกใช้ได้จากปุ่มด้านบนหมวด — ถ้าจะใช้กับคำสั่ง score ให้กด “ส่งออกไป config” ด้วย</p>
+    <input type="text" id="pname" placeholder="ชื่อ เช่น ขายขนมหน้านิคม">
     <div class="btnrow"><button class="primary" id="psave">บันทึก</button><button data-close>ยกเลิก</button></div>`);
   $("pname").focus();
   $("psave").onclick = () => {
     const name = $("pname").value.trim();
     if (!name) return;
-    S.custom[name] = Object.fromEntries(Object.entries(S.weights).filter(([, w]) => w));
-    S.persona = name; S.modified = false;
+    S.presets[name] = clone(S.pillars);
     $("modal").hidden = true;
-    renderPersonas(); update();
+    renderPresets(); save();
   };
 };
 
-$("btn-reset").onclick = () => { S.weights = personaWeights(S.persona); S.modified = false; renderPersonas(); renderWeights(); update(); };
+$("btn-reset").onclick = () => { S.pillars = clone(DATA.pillars); renderAll(); };
 
 $("btn-export").onclick = () => {
   const feats = DATA.features.filter(f => f.key !== "reviews" && f.key !== "rating");
-  const head = ["อันดับ", "ชื่อตลาด", "ประเภท", "อำเภอ", "คะแนน", "รีวิว", "เรตติ้ง", "ติดดาว", "บันทึก", "จุดเด่น", "เวลาเปิด", "ที่อยู่", "Google Maps", "lat", "lng",
+  const head = ["อันดับ", "ชื่อตลาด", "ประเภท", "อำเภอ", "คะแนน", ...S.res.pillars.map(p => p.label), "ย่าน", "รีวิว", "เรตติ้ง", "ติดดาว", "บันทึก",
+    "เวลาเปิด", "ที่อยู่", "Google Maps", "lat", "lng",
     ...feats.map(f => f.label + (f.radius ? ` ≤${radLabel(f.radius)}` : "") + (f.unit ? ` (${f.unit})` : ""))];
   const q = v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const lines = [head.map(q).join(",")];
   for (const i of S.rows) {
     const m = MARKETS[i];
-    lines.push([S.rank[i], m.name, m.kind, m.amphoe, S.res.scores[i], m.reviews, m.rating, S.shortlist[m.id] ? "★" : "", S.notes[m.id] || "",
-      highlights(i).map(h => FEAT[h.key]?.label).join(" / "), m.hours, m.address, m.url, m.lat, m.lng,
+    lines.push([S.rank[i], m.name, m.kind, m.amphoe, S.res.scores[i], ...S.res.pillars.map(p => Math.round(p.scores[i] * 1000) / 10),
+      profiles(i).join(" / "), m.reviews, m.rating, S.shortlist[m.id] ? "★" : "", S.notes[m.id] || "",
+      m.hours, m.address, m.url, m.lat, m.lng,
       ...feats.map(f => m.f[f.key] === null || m.f[f.key] === undefined ? "" : +(m.f[f.key] * (f.scale || 1)).toFixed(2))].map(q).join(","));
   }
   const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `ตลาด_${PERSONA_LABELS[S.persona] || S.persona}_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `ตลาด_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
@@ -842,12 +936,11 @@ $("btn-export").onclick = () => {
 $("btn-side").onclick = () => $("side").classList.toggle("open");
 
 /* ---------- boot ---------- */
+function renderAll() { renderPresets(); renderPillars(); renderAdvanced(); update(); }
 $("sub").textContent = `${DATA.area ? DATA.area + " · " : ""}ข้อมูล ${DATA.generated}`;
-renderPersonas();
-renderWeights();
 setupFilters();
 setupMap();
-update();
+renderAll();
 </script>
 </body>
 </html>

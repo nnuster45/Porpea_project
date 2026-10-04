@@ -154,19 +154,15 @@ def cmd_score(cfg, args):
     from .score import build_features, score
 
     sc = cfg["scoring"]
-    persona = args.persona or sc["persona"]
-    if persona not in sc["personas"]:
-        sys.exit(f"unknown persona '{persona}', choose from {list(sc['personas'])}")
     df = build_features(
         load_markets(),
         need(DETAILS, "enrich"),
         need(SURROUND, "surround"),
         sc.get("rating_prior_reviews", 30),
     )
-    ranked = score(df, sc["personas"][persona])
+    ranked = score(df, sc["pillars"], sc.get("profile_top_pct", 30))
     ranked.to_csv(RANKED, index=False, encoding="utf-8-sig")
-    cols = ["rank", "score", "name", "reviews", "rating", "why"]
-    print(f"persona: {persona}")
+    cols = ["rank", "score", *[f"pillar_{k}" for k in sc["pillars"] if f"pillar_{k}" in ranked], "name", "profile"]
     print(ranked[cols].head(20).to_string(index=False))
     print(f"→ {RANKED}")
 
@@ -204,7 +200,7 @@ COMMANDS = {
     "discover": (cmd_discover, "1. find markets (Text Search) → data/markets.csv"),
     "enrich": (cmd_enrich, "2. reviews / rating / opening hours → data/market_details.csv"),
     "surround": (cmd_surround, "3. count POIs around each market → data/surroundings.csv"),
-    "score": (cmd_score, "4. rank markets for a persona → data/ranked.csv"),
+    "score": (cmd_score, "4. rank markets (scoring.pillars) → data/ranked.csv"),
     "map": (cmd_map, "5. interactive map → data/map.html"),
     "dashboard": (cmd_dashboard, "6. dashboard: tune weights/filters live → data/dashboard.html"),
     "all": (cmd_all, "run stages 1–6"),
@@ -215,7 +211,6 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="sitefinder", description="หาทำเลตลาดสำหรับตั้งร้าน")
     parser.add_argument("command", choices=COMMANDS, help=" | ".join(f"{k}: {v[1]}" for k, v in COMMANDS.items()))
     parser.add_argument("--config", default="config.yaml")
-    parser.add_argument("--persona", help="override scoring.persona")
     parser.add_argument("--max-calls", type=int, default=4900, help="stop after this many billable Google calls in one run (cached calls are free)")
     parser.add_argument("--markets", type=int, default=400, help="assumed market count for `estimate`")
     args = parser.parse_args(argv)
