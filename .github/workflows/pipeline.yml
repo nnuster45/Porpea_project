@@ -129,6 +129,10 @@ jobs:
           python -m sitefinder score
           python -m sitefinder dashboard
 
+      - name: QA report (in the run summary)
+        if: ${{ inputs.stages != 'discover' }}
+        run: python -m sitefinder qa
+
       # บันทึกแม้ขั้นก่อนหน้าล้ม (เช่น ชน --max-calls) — รอบหน้าจะทำต่อจาก cache ไม่เสีย quota ซ้ำ
       - name: Save data for next run
         if: ${{ always() }}

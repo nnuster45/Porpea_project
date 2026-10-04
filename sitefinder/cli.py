@@ -249,6 +249,22 @@ def cmd_map(cfg, args):
     print(f"→ {MAP} (open in a browser)")
 
 
+def cmd_qa(cfg, args):
+    from .qa import report
+    from .score import build_features, score
+
+    sc = cfg["scoring"]
+    df = build_features(load_markets(), need(DETAILS, "enrich"), need(SURROUND, "surround"),
+                        sc.get("rating_prior_reviews", 30))
+    ranked = score(df, sc["pillars"], sc.get("profile_top_pct", 30), log=lambda *_: None)
+    text = report(df, ranked)
+    print(text)
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as f:
+            f.write(text + "\n")
+
+
 def cmd_dashboard(cfg, args):
     from .dashboard import build_payload, render
     from .score import build_features
@@ -279,6 +295,7 @@ COMMANDS = {
     "score": (cmd_score, "4. rank markets (scoring.pillars) → data/ranked.csv"),
     "map": (cmd_map, "5. interactive map → data/map.html"),
     "dashboard": (cmd_dashboard, "6. dashboard: tune weights/filters live → data/dashboard.html"),
+    "qa": (cmd_qa, "data-quality report: distributions, top values, near-duplicates, correlated measures"),
     "all": (cmd_all, "run stages 1–6"),
 }
 
