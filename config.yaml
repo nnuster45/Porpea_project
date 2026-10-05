@@ -124,36 +124,36 @@ scoring:
     reviews: minmax
   pillars:
     market:
-      label: ตลาดนี้มีคนมาจริงไหม
-      tag: ตลาดคนเยอะ
+      label: ความนิยม
+      tag: ตลาดดัง
       weight: 2              # หลักฐานตรงที่สุด จึงหนักกว่าหมวดอื่น
       measures:
         reviews: 1
         rating: 0            # เรตติ้งไม่ได้บอกจำนวนคน (ค่าลบกับจำนวนรีวิว) — ดูประกอบได้ ไม่นับคะแนน
     activity:
-      label: หน้าตลาดคึกคักไหม
+      label: ความคึกคัก
       tag: ย่านคึกคัก
       weight: 1
       measures:
         conv_store_500: 2    # ร้านสะดวกซื้อในระยะเดิน — ถ้ามีไฟล์ 7-11 ใช้ seven_500 แทนได้ (อย่าใส่ทั้งคู่)
         mall_1500: 1
     residents:
-      label: คนอยู่อาศัย / นักศึกษาแถวนี้เยอะไหม
+      label: ที่พักอาศัย
       tag: ย่านที่พัก
       weight: 1
       measures:
         apartment_1500: 2
         campus_3000: 1       # จำนวนมหาวิทยาลัย/วิทยาลัย (นับวิทยาเขต ไม่ใช่ตึก) จาก OSM
     workers:
-      label: คนทำงานโรงงาน / ออฟฟิศแถวนี้เยอะไหม
-      tag: ย่านโรงงาน/ที่ทำงาน
+      label: แหล่งงาน
+      tag: ย่านคนทำงาน
       weight: 1
       measures:
         industrial_ha_1500: 2
         estate_workers_3000: 2
         workplace_500: 1
     tourists:
-      label: นักท่องเที่ยวแถวนี้เยอะไหม
+      label: นักท่องเที่ยว
       tag: ย่านท่องเที่ยว
       weight: 0.5            # แยกจาก "คนอยู่อาศัย" — โรงแรมคือนักท่องเที่ยว ไม่ใช่คนในพื้นที่
       measures:

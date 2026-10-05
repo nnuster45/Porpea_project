@@ -308,83 +308,70 @@ details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; co
 <div class="layout">
   <aside class="side" id="side">
     <section class="card">
-      <h2><span class="step">1</span>ให้ความสำคัญกับอะไร</h2>
-      <p class="hint">ทุกตลาดถูกเทียบกันในแต่ละหมวด — เลื่อนไปทางขวา = สำคัญมาก, ซ้ายสุด = ไม่นำมาคิด · กด ▸ เพื่อดู/ปรับว่าหมวดนั้นนับจากอะไร</p>
+      <h2><span class="step">1</span>น้ำหนัก</h2>
       <div id="custom-note" class="notice" hidden></div>
       <div id="presets" class="chips" style="margin-bottom:8px"></div>
       <div id="pillars"></div>
       <div class="share" id="share" aria-hidden="true"></div>
       <div class="share-l" id="share-l"></div>
       <div class="btnrow">
-        <button id="btn-reset">↺ ค่าเริ่มต้น</button>
+        <button id="btn-reset">↺ รีเซ็ต</button>
         <button id="btn-save">บันทึกชุดนี้</button>
-        <button id="btn-yaml">ส่งออกไป config</button>
+        <button id="btn-yaml">ส่งออก config</button>
       </div>
     </section>
 
     <section class="card">
-      <h2><span class="step">2</span>กรองตลาด</h2>
-      <div class="field"><input type="search" id="f-q" placeholder="ค้นหาชื่อตลาด / ที่อยู่"></div>
-      <div class="field"><label class="lbl">ย่าน (ตลาดที่หมวดนั้นติดกลุ่มบน)</label><div class="chips" id="f-profile"></div></div>
-      <div class="field"><label class="lbl">ประเภทตลาด</label><div class="chips" id="f-kinds"></div></div>
+      <h2><span class="step">2</span>ตัวกรอง</h2>
+      <div class="field"><input type="search" id="f-q" placeholder="ค้นหาชื่อ / ที่อยู่"></div>
+      <div class="field"><label class="lbl">ย่าน</label><div class="chips" id="f-profile"></div></div>
+      <div class="field"><label class="lbl">ประเภท</label><div class="chips" id="f-kinds"></div></div>
       <div class="field"><label class="lbl" for="f-amphoe">อำเภอ</label><select id="f-amphoe"></select></div>
       <div class="field">
         <label class="lbl" for="f-rev">รีวิวขั้นต่ำ: <b id="f-rev-v">0</b></label>
         <input type="range" id="f-rev" min="0" max="500" step="10" value="0">
       </div>
       <div class="field">
-        <label class="lbl">ต้องเปิดช่วง (ช่วงที่คุณจะไปขาย)</label>
+        <label class="lbl" title="เปิดอย่างน้อย 1 ชม. ในช่วงนั้น">ช่วงเวลาเปิด</label>
         <div class="checks">
-          <label><input type="checkbox" id="f-morning">เช้า</label>
-          <label><input type="checkbox" id="f-evening">เย็น</label>
-          <label><input type="checkbox" id="f-night">ดึก</label>
+          <label><input type="checkbox" id="f-morning">เช้า <span class="msub">06–10</span></label>
+          <label><input type="checkbox" id="f-evening">เย็น <span class="msub">16–20</span></label>
+          <label><input type="checkbox" id="f-night">ดึก <span class="msub">20–02</span></label>
         </div>
-        <p class="hint" style="margin:4px 0 0">นับเมื่อเปิดอย่างน้อย 1 ชม. ในช่วง เช้า 06–10 · เย็น 16–20 · ดึก 20–02</p>
       </div>
-      <div class="field"><label class="lbl">ต้องเปิดวัน (วันที่คุณว่างไปขาย)</label><div class="chips" id="f-days"></div></div>
-      <div class="field checks"><label><input type="checkbox" id="f-unknown" checked>รวมตลาดที่ไม่ทราบเวลาเปิด (<span id="n-unknown">0</span>)</label></div>
-      <div class="field checks"><label><input type="checkbox" id="f-short">เฉพาะที่ติดดาว ★</label></div>
+      <div class="field"><label class="lbl">วันที่เปิด</label><div class="chips" id="f-days"></div></div>
+      <div class="field checks"><label><input type="checkbox" id="f-unknown" checked>รวมที่ไม่ทราบเวลา (<span id="n-unknown">0</span>)</label></div>
+      <div class="field checks"><label><input type="checkbox" id="f-short">เฉพาะ ★</label></div>
     </section>
 
     <section class="card">
-      <h2>คัดรายชื่อตลาด</h2>
-      <p class="hint">กด “🚫 ไม่ใช่ตลาด” ในแผงรายละเอียด — ที่ซ่อนจะไม่ถูกนำมาคิดอันดับทันที แล้ว ⬇ keep.csv ไปแทน <code>review/keep.csv</code> (รวมของเดิมให้แล้ว) — รอบหน้าจะไม่เสีย quota กับที่เหล่านี้</p>
-      <div class="field checks"><label><input type="checkbox" id="f-hidden">แสดงที่ซ่อนไว้ (<span id="n-hidden">0</span>)</label></div>
+      <h2>คัดรายชื่อ</h2>
+      <div class="field checks"><label><input type="checkbox" id="f-hidden">แสดงที่ซ่อน (<span id="n-hidden">0</span>)</label></div>
       <details class="adv" id="exbox">
-        <summary>ที่ระบบตัดออกอัตโนมัติ (<span id="n-excluded">0</span>) — ตรวจ / เอากลับมา</summary>
+        <summary>ตัดออกอัตโนมัติ (<span id="n-excluded">0</span>)</summary>
         <div class="field"><input type="search" id="ex-q" placeholder="ค้นหาชื่อ"></div>
         <div id="exlist"></div>
       </details>
-      <div class="btnrow"><button id="btn-keep">⬇ keep.csv</button></div>
+      <div class="btnrow"><button id="btn-keep" title="ใช้แทน review/keep.csv (รวมของเดิมแล้ว)">⬇ keep.csv</button></div>
     </section>
 
     <section class="card">
-      <h2>ตั้งค่าอื่น ๆ</h2>
+      <h2>ตั้งค่า</h2>
       <div class="field">
-        <label class="lbl" for="o-prior">ความเชื่อเรตติ้ง: ตลาดที่รีวิวน้อยกว่า <b id="o-prior-v"></b> รีวิวจะถูกดึงเข้าหาค่าเฉลี่ย</label>
+        <label class="lbl" for="o-prior" title="ตลาดที่รีวิวน้อยกว่านี้ เรตติ้งจะถูกดึงเข้าหาค่าเฉลี่ย">ถ่วงเรตติ้ง: <b id="o-prior-v"></b> รีวิว</label>
         <input type="range" id="o-prior" min="1" max="200" step="1">
       </div>
       <div class="field">
-        <label class="lbl" for="o-thr">ติดป้ายย่านให้ตลาดที่อยู่ top <b id="o-thr-v"></b>% ของหมวดนั้น</label>
+        <label class="lbl" for="o-thr">ป้ายย่าน: top <b id="o-thr-v"></b>%</label>
         <input type="range" id="o-thr" min="5" max="50" step="5">
       </div>
       <div class="field">
-        <label class="lbl" for="o-top">ไฮไลต์บนแผนที่ (หมุดใหญ่): <b id="o-top-v"></b> อันดับแรก</label>
+        <label class="lbl" for="o-top">หมุดใหญ่: <b id="o-top-v"></b> อันดับแรก</label>
         <input type="range" id="o-top" min="5" max="100" step="5">
       </div>
-      <div class="btnrow" style="margin-bottom:10px">
-        <button id="btn-backup">⬇ สำรองดาว/บันทึก</button>
+      <div class="btnrow">
+        <button id="btn-backup" title="ดาว บันทึก ที่ซ่อน เก็บในเบราว์เซอร์นี้เท่านั้น">⬇ สำรอง</button>
         <label class="linkbtn" style="cursor:pointer">⬆ นำเข้า<input type="file" id="in-backup" accept="application/json" hidden></label>
-      </div>
-      <p class="hint">ดาว บันทึก และที่ซ่อน เก็บในเบราว์เซอร์นี้เท่านั้น (iPhone อาจลบถ้าไม่ได้เปิด 7 วัน) — สำรองไว้เป็นระยะ</p>
-      <div class="info">
-        ค่าเหล่านี้ต้อง <b>ดึงข้อมูลใหม่</b> — แก้ใน <code>config.yaml</code> แล้วรันคำสั่ง:
-        <ul style="margin:4px 0 0;padding-left:18px">
-          <li>คำค้นหาตลาด / พื้นที่ → <code>discover</code></li>
-          <li>รัศมี / ประเภทสถานที่รอบตลาด → <code>surround</code></li>
-          <li>ไฟล์ 7-11 / นิคมฯ → <code>surround</code></li>
-        </ul>
-        แล้วรัน <code>python -m sitefinder dashboard</code> ใหม่
       </div>
     </section>
   </aside>
@@ -400,7 +387,7 @@ details.adv > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; co
           <span><i style="background:var(--s2)"></i>40–55</span>
           <span><i style="background:var(--s1)"></i>&lt;40</span>
         </div>
-        <div style="margin-top:4px">กลุ่ม A = top 10% · B = 10–30% · C = 30–60%</div>
+        <div style="margin-top:4px">A top 10% · B 10–30% · C 30–60%</div>
       </div>
     </div>
     <div class="tablebox" id="tablebox">
@@ -502,7 +489,7 @@ function scorePillars(markets, pillars, prior, scales = {}) {
 
 /* ================= UI ================= */
 const KIND_ORDER = ["ตลาดนัด", "ตลาดเย็น", "ตลาดเช้า", "ตลาดโต้รุ่ง", "ถนนคนเดิน", "ตลาดกลางคืน", "ตลาดทั่วไป"];
-const SHORT = { market: "ตลาด", activity: "คึกคัก", residents: "ที่พัก", workers: "ทำงาน", tourists: "ท่องเที่ยว" };
+const SHORT = { market: "นิยม", activity: "คึกคัก", residents: "ที่พัก", workers: "งาน", tourists: "ท่องเที่ยว" };
 const DAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];  // Sunday first, like Google
 const dayText = mask => (mask || "").split("").map((c, d) => (c === "1" ? DAYS[d] : null)).filter(Boolean).join(" ");
 const $ = id => document.getElementById(id);
@@ -588,8 +575,8 @@ function renderNotice() {
   const custom = JSON.stringify(S.pillars) !== BASE;
   el.hidden = !custom && !configChanged;
   el.innerHTML = custom
-    ? `กำลังใช้น้ำหนักที่ปรับเอง (ไม่ใช่ค่าใน config)<button id="note-reset">คืนค่า config</button>`
-    : "ค่าน้ำหนักใน config เปลี่ยน — ใช้ค่าใหม่แทนที่เคยปรับไว้";
+    ? `ใช้น้ำหนักที่ปรับเอง<button id="note-reset">คืนค่า config</button>`
+    : "config เปลี่ยน — ใช้ค่าใหม่แล้ว";
   const b = $("note-reset");
   if (b) b.onclick = () => { S.pillars = clone(DATA.pillars); renderAll(); };
 }
@@ -640,12 +627,11 @@ function measureEditor(p) {
   const free = DATA.features.map(f => f.key).filter(k => !pillarOf(k) && hasData(k) && k !== "dup_count");
   const elsewhere = S.pillars.filter(x => x !== p && Object.keys(x.measures).length);
   const opt = k => `<option value="${esc(k)}">${esc(featLabel(k))}</option>`;
-  const add = `<select class="add" aria-label="เพิ่มตัววัด"><option value="">＋ เพิ่มตัววัดในหมวดนี้…</option>
-      ${free.length ? `<optgroup label="ยังไม่ได้ใช้">${free.map(opt).join("")}</optgroup>` : ""}
-      ${elsewhere.map(x => `<optgroup label="ย้ายมาจาก: ${esc(SHORT[x.key] || x.label)}">${Object.keys(x.measures).map(opt).join("")}</optgroup>`).join("")}
+  const add = `<select class="add" aria-label="เพิ่มตัววัด"><option value="">＋ เพิ่มตัววัด</option>
+      ${free.length ? `<optgroup label="ยังไม่ใช้">${free.map(opt).join("")}</optgroup>` : ""}
+      ${elsewhere.map(x => `<optgroup label="ย้ายจาก ${esc(x.label)}">${Object.keys(x.measures).map(opt).join("")}</optgroup>`).join("")}
     </select>`;
   return `<div class="pin">
-    <p class="hint">น้ำหนักภายในหมวด — ตัววัดหนึ่งอยู่ได้หมวดเดียว กันการนับซ้ำ</p>
     ${rows || `<p class="hint">ยังไม่มีตัววัด</p>`}${add}</div>`;
 }
 
@@ -679,6 +665,15 @@ function renderShare() {
   const colors = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)"];
   $("share-l").innerHTML = S.pillars.map((p, i) =>
     `<span><i style="background:${colors[i % 5]}"></i>${esc(SHORT[p.key] || p.label)} ${Math.round(Math.abs(p.weight) / tot * 100)}%</span>`).join("");
+}
+
+// discover's keep notes (English, in markets.csv) → short Thai
+function whyExcluded(note) {
+  return String(note || "")
+    .replace(/^name looks like a shop branch\/residence$/, "ชื่อแบบร้าน / สาขา / ที่พัก")
+    .replace(/^looks like a stall\/shop inside a market$/, "แผงในตลาด")
+    .replace(/^not a market type: /, "ประเภท: ")
+    .replace(/^not a market: /, "ไม่ใช่ตลาด: ");
 }
 
 /* ---------- filters ---------- */
@@ -834,7 +829,7 @@ function renderTable() {
   const tb = $("tbody");
   const cols = 7 + S.res.pillars.length;
   if (!S.rows.length) {
-    tb.innerHTML = `<tr><td colspan="${cols}" class="empty">ไม่มีตลาดที่ตรงเงื่อนไข — ลองลดตัวกรองในข้อ 2</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="${cols}" class="empty">ไม่มีตลาดที่ตรงเงื่อนไข</td></tr>`;
     return;
   }
   tb.innerHTML = S.rows.map(i => {
@@ -946,17 +941,12 @@ function compareText(key, i) {
   const vals = S.res.valuesOf(key);
   const less = vals.filter(x => x < v).length / vals.length;
   const same = vals.filter(x => x === v).length;
-  let t = `มากกว่า ${Math.round(less * 100)}% ของตลาด`;
-  if (same > 1 && same / vals.length >= 0.1) t += ` · เท่ากับอีก ${fmt(same - 1)} ตลาด`;
+  let t = `สูงกว่า ${Math.round(less * 100)}%`;
+  if (same > 1 && same / vals.length >= 0.1) t += ` · เท่ากัน ${fmt(same - 1)} ตลาด`;
   return { less, t };
 }
 
 const mapsAt = (lat, lng) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-const ITEM_NOTE = {
-  osm: "จาก OpenStreetMap (แผนที่อาสา) — อาจขาดหรือเกินจากของจริง · คลิกชื่อเพื่อดูตำแหน่ง",
-  campus: "จาก OpenStreetMap — ตึก/คณะที่อยู่ติดกันนับเป็น 1 แห่ง · ระยะ = ถึงขอบพื้นที่ที่ใกล้สุด",
-  area: "พื้นที่ที่ OSM ระบุเป็นเขตอุตสาหกรรม — ส่วนที่ทับกันคิดครั้งเดียวในตัวเลขด้านบน · ระยะ = ถึงขอบพื้นที่",
-};
 
 // what a count is made of, for checking: a list (OSM / your files) or a Google Maps search (Google counts)
 function itemsHtml(key, m) {
@@ -965,39 +955,35 @@ function itemsHtml(key, m) {
     const r = f.radius || 500;
     const zoom = r <= 500 ? 16 : r <= 1500 ? 14 : 13;
     const url = `https://www.google.com/maps/search/${encodeURIComponent(f.search)}/@${m.lat},${m.lng},${zoom}z`;
-    return `<div class="items">
-      <p>Google ส่งมาแค่ <b>จำนวน</b> ไม่บอกว่าเป็นที่ไหนบ้าง (ขอรายชื่อต้องเสีย quota ทีละที่)</p>
-      <a class="linkbtn" href="${esc(url)}" target="_blank" rel="noopener">ค้น “${esc(f.search)}” รอบตลาดนี้ใน Google Maps ↗</a>
-      <p class="hint">ผลใน Maps จะไม่ตรงกับตัวเลขเป๊ะ — Maps แสดงทีละราว 20 ที่ และไม่ได้ตัดที่รัศมี ${radLabel(r)}</p></div>`;
+    return `<div class="items"><a class="linkbtn" href="${esc(url)}" target="_blank" rel="noopener" title="Google ให้แค่จำนวน — ผลค้นใน Maps อาจไม่ตรงเป๊ะ">ดูใน Google Maps ↗</a></div>`;
   }
   if (!f.src || f.src === "google") return null;
   const list = (m.items || {})[key];
   if (!list) {
-    return `<div class="items"><p class="hint">${DATA.hasItems ? "ไม่มีรายชื่อสำหรับตัววัดนี้" : "ยังไม่มีรายชื่อ — รัน <code>surround</code> ใหม่ (ไม่เสีย quota) แล้วสร้าง dashboard ใหม่"}</p></div>`;
+    return `<div class="items"><p class="hint">ไม่มีรายชื่อ</p></div>`;
   }
   const isArea = f.src === "area";
   const rows = list.map(([p, d, extra]) => {
     const [name, lat, lng] = DATA.places[p];
     const right = [
-      isArea ? `${fmt(extra * (f.scale || 1), 1)} ${esc(f.unit)}ในรัศมี` : (extra !== undefined ? `${fmt(extra)} ${esc(f.unit)}` : ""),
-      d ? `${fmt(d)} ม.` : (isArea || f.src === "campus" ? "ตลาดอยู่ในพื้นที่" : "0 ม."),
+      isArea ? `${fmt(extra * (f.scale || 1), 1)} ${esc(f.unit)}` : (extra !== undefined ? `${fmt(extra)} ${esc(f.unit)}` : ""),
+      d ? `${fmt(d)} ม.` : (isArea || f.src === "campus" ? "ในพื้นที่" : "0 ม."),
     ].filter(Boolean).join(" · ");
-    return `<li class="${name ? "" : "noname"}"><div><a href="${esc(mapsAt(lat, lng))}" target="_blank" rel="noopener">${esc(name || "(ไม่มีชื่อในแผนที่)")}</a><span>${right}</span></div></li>`;
+    return `<li class="${name ? "" : "noname"}"><div><a href="${esc(mapsAt(lat, lng))}" target="_blank" rel="noopener">${esc(name || "(ไม่มีชื่อ)")}</a><span>${right}</span></div></li>`;
   }).join("");
   const total = m.f[key];
   const more = !isArea && f.src !== "file" && isNum(total) && total > list.length
-    ? `<p class="hint">แสดง ${fmt(list.length)} ที่ใกล้สุด จากทั้งหมด ${fmt(total)}</p>` : "";
-  const note = f.src === "file" ? `จากไฟล์ <code>${esc(f.file || "")}</code> ของคุณ` : ITEM_NOTE[f.src] || "";
-  return `<div class="items">${list.length ? `<ol>${rows}</ol>` : `<p>ไม่มีในรัศมีนี้</p>`}${more}<p class="hint">${note}</p></div>`;
+    ? `<p class="hint">+ อีก ${fmt(total - list.length)}</p>` : "";
+  return `<div class="items">${list.length ? `<ol>${rows}</ol>` : `<p class="hint">ไม่มี</p>`}${more}</div>`;
 }
 
 function measureRow(key, m, i, w) {
   const c = compareText(key, i);
   const pts = S.res.pctOf(key);
   const used = pts ? pts[i] : null;
-  const row = `<div class="frow"><div>${esc(FEAT[key]?.label || key)}${radTag(key)}${w ? `<span class="rad" style="color:var(--accent-ink)">น้ำหนัก ${w}</span>` : ""}</div>
+  const row = `<div class="frow"><div>${esc(FEAT[key]?.label || key)}${radTag(key)}${w ? `<span class="rad" style="color:var(--accent-ink)" title="น้ำหนักในหมวด">×${w}</span>` : ""}</div>
     <div class="v">${valueText(key, m, i)}</div>
-    ${!c ? `<div class="p">ไม่มีข้อมูล — คิดเป็นกลาง ๆ (50%)</div>` : `<div class="p"><div class="bar"><span style="width:${(isNum(used) ? used : c.less) * 100}%"></span></div>${c.t}</div>`}</div>`;
+    ${!c ? `<div class="p">ไม่มีข้อมูล (คิด 50%)</div>` : `<div class="p"><div class="bar"><span style="width:${(isNum(used) ? used : c.less) * 100}%"></span></div>${c.t}</div>`}</div>`;
   const items = itemsHtml(key, m);
   return items === null ? row : `<details class="fx" data-k="${esc(key)}"${S.openItems.has(key) ? " open" : ""}><summary>${row}</summary>${items}</details>`;
 }
@@ -1009,7 +995,7 @@ function renderDetail(i) {
     const v = p.scores[i] * 100;
     const pts = p.scores[i] * p.weight / S.res.totalW * 100;
     const max = Math.abs(p.weight) / S.res.totalW * 100;
-    return `<div class="pblock"><div class="ph">${esc(p.label)}<span>${fmt(v)} / 100 → ได้ ${fmt(pts, 1)} จาก ${fmt(max, 1)} คะแนน</span></div>
+    return `<div class="pblock"><div class="ph">${esc(p.label)}<span title="ได้ ${fmt(pts, 1)} จาก ${fmt(max, 1)} คะแนนรวม">${fmt(v)} · +${fmt(pts, 1)}</span></div>
       <div class="bar"><span style="width:${Math.max(0, Math.min(100, v))}%"></span></div>
       ${p.parts.map(x => measureRow(x.key, m, i, x.w)).join("")}</div>`;
   }).join("");
@@ -1023,26 +1009,24 @@ function renderDetail(i) {
     <div class="msub">${esc(m.kind)} · อ.${esc(m.amphoe)}</div>
     <h3>${esc(m.name)}</h3>
     <div class="msub">${esc(m.address)}</div>
-    <div class="bigscore">${S.res.tiers[i] ? `<span class="tier t${S.res.tiers[i]}" style="font-size:15px;height:28px;min-width:30px">${S.res.tiers[i]}</span>` : ""}<b style="color:${s >= 55 ? "var(--accent-ink)" : "var(--text)"}">${fmt(s, 1)}</b><span>${hidden ? "ซ่อนไว้ — ไม่นำมาคิดอันดับ" : `คะแนน · อันดับ ${S.rank[i]} จาก ${S.res.n}`}</span></div>
-    ${hidden ? "" : `<p class="hint" style="margin:0 0 6px">อันดับที่ใกล้กันไม่ได้ต่างกันจริง — ดูกลุ่ม A/B/C/D เป็นหลัก</p>`}
+    <div class="bigscore">${S.res.tiers[i] ? `<span class="tier t${S.res.tiers[i]}" style="font-size:15px;height:28px;min-width:30px">${S.res.tiers[i]}</span>` : ""}<b style="color:${s >= 55 ? "var(--accent-ink)" : "var(--text)"}">${fmt(s, 1)}</b><span>${hidden ? "ซ่อนอยู่" : `อันดับ ${S.rank[i]} / ${S.res.n}`}</span></div>
     ${tags ? `<div>${tags}</div>` : ""}
-    ${m.days ? `<div class="msub" style="margin-top:6px">เปิด: ${esc(dayText(m.days) || "ไม่ระบุ")}</div>` : `<div class="msub" style="margin-top:6px">ไม่ทราบวัน/เวลาเปิด — ตรวจหน้างานหรือเพจของตลาด</div>`}
-    ${m.dups ? `<div class="msub" style="margin-top:4px">รวม listing ซ้ำใน Google แล้ว: ${esc(m.dups)}</div>` : ""}
+    ${m.days ? `<div class="msub" style="margin-top:6px">เปิด: ${esc(dayText(m.days) || "ไม่ระบุ")}</div>` : `<div class="msub" style="margin-top:6px">ไม่ทราบเวลาเปิด</div>`}
+    ${m.dups ? `<div class="msub" style="margin-top:4px">รวมหมุดซ้ำ: ${esc(m.dups)}</div>` : ""}
     <div class="btnrow">
-      <button class="star" id="d-star" aria-pressed="${!!S.shortlist[m.id]}" style="border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:14px">${S.shortlist[m.id] ? "★ ติดดาวแล้ว" : "☆ ติดดาวไว้ลงพื้นที่"}</button>
-      ${m.url ? `<a class="linkbtn" href="${esc(m.url)}" target="_blank" rel="noopener">เปิดใน Google Maps ↗</a>` : ""}
-      <button id="d-hide">${S.hidden[m.id] ? "↩ เอากลับมา" : "🚫 ไม่ใช่ตลาด"}</button>
+      <button class="star" id="d-star" aria-pressed="${!!S.shortlist[m.id]}" style="border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:14px">${S.shortlist[m.id] ? "★ ติดดาวแล้ว" : "☆ ติดดาว"}</button>
+      ${m.url ? `<a class="linkbtn" href="${esc(m.url)}" target="_blank" rel="noopener">Google Maps ↗</a>` : ""}
+      <button id="d-hide">${S.hidden[m.id] ? "↩ เอากลับ" : "🚫 ไม่ใช่ตลาด"}</button>
     </div>
 
-    <h4>คะแนนมาจากไหน</h4>
-    <p class="hint" style="margin:-4px 0 6px">กด ▸ ที่ตัววัดเพื่อดูว่านับอะไรมาบ้าง</p>
-    ${blocks || `<p class="hint">${hidden ? "ซ่อนไว้ จึงไม่ได้คิดคะแนน — กด “เอากลับมา” เพื่อคิดใหม่" : "ยังไม่ได้ให้น้ำหนักหมวดใด"}</p>`}
+    <h4>ที่มาของคะแนน</h4>
+    ${blocks || `<p class="hint">${hidden ? "ซ่อนอยู่ — ไม่คิดคะแนน" : "ยังไม่มีหมวดที่มีน้ำหนัก"}</p>`}
 
-    <h4>บันทึกของคุณ</h4>
-    <textarea id="d-note" placeholder="เช่น ไปดูวันเสาร์ คนเยอะช่วง 18:00, ค่าแผง 150 บาท/วัน">${esc(S.notes[m.id] || "")}</textarea>
+    <h4>บันทึก</h4>
+    <textarea id="d-note" placeholder="เช่น เสาร์ คนเยอะ 18:00, ค่าแผง 150/วัน">${esc(S.notes[m.id] || "")}</textarea>
 
     ${hours.length ? `<h4>เวลาเปิด</h4><ul class="hours">${hours.map(h => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
-    ${others ? `<details style="margin-top:14px"><summary class="msub" style="cursor:pointer">ข้อมูลอื่นที่ไม่ได้ใช้ในคะแนน</summary>${others}</details>` : ""}
+    ${others ? `<details style="margin-top:14px"><summary class="msub" style="cursor:pointer">ข้อมูลอื่น</summary>${others}</details>` : ""}
   `;
   $("d-close").onclick = () => {
     $("detail").classList.remove("open");
@@ -1085,8 +1069,8 @@ function pillarsYaml() {
 }
 
 $("btn-yaml").onclick = () => {
-  modal(`<h3>ส่งออกน้ำหนักไปใส่ config.yaml</h3>
-    <p class="hint">แทนที่ส่วน <code>pillars:</code> ใต้ <code>scoring:</code> ใน config.yaml เพื่อให้คำสั่ง <code>score</code> และ dashboard รอบหน้าใช้ค่านี้</p>
+  modal(`<h3>ส่งออก config</h3>
+    <p class="hint">วางแทน <code>scoring.pillars</code> ใน config.yaml</p>
     <pre id="yaml">${esc(pillarsYaml())}</pre>
     <div class="btnrow"><button class="primary" id="copy">คัดลอก</button><button data-close>ปิด</button></div>`);
   $("copy").onclick = async () => {
@@ -1096,8 +1080,7 @@ $("btn-yaml").onclick = () => {
 };
 
 $("btn-save").onclick = () => {
-  modal(`<h3>บันทึกชุดน้ำหนักนี้</h3>
-    <p class="hint">เก็บไว้ในเบราว์เซอร์นี้ กดเรียกใช้ได้จากปุ่มด้านบนหมวด — ถ้าจะใช้กับคำสั่ง score ให้กด “ส่งออกไป config” ด้วย</p>
+  modal(`<h3>บันทึกชุดน้ำหนัก</h3>
     <input type="text" id="pname" placeholder="ชื่อ เช่น ขายขนมหน้านิคม">
     <div class="btnrow"><button class="primary" id="psave">บันทึก</button><button data-close>ยกเลิก</button></div>`);
   $("pname").focus();
@@ -1150,7 +1133,7 @@ $("btn-keep").onclick = () => {
   const rows = new Map((DATA.review || []).map(r => [r.id, { keep: r.keep, note: r.note }]));
   for (const id of Object.keys(S.hidden)) rows.set(id, { keep: 0, note: S.notes[id] || "ซ่อนจาก dashboard" });
   for (const id of Object.keys(S.restored)) rows.set(id, { keep: 1, note: "เอากลับจาก dashboard" });
-  if (!rows.size) { modal(`<h3>ยังไม่มีอะไรต้องบันทึก</h3><p class="hint">กด “🚫 ไม่ใช่ตลาด” ในแผงรายละเอียด หรือ “เอากลับมา” ในรายการที่ระบบตัดออก</p><div class="btnrow"><button data-close>ปิด</button></div>`); return; }
+  if (!rows.size) { modal(`<h3>ยังไม่มีรายการที่ซ่อนหรือเอากลับ</h3><div class="btnrow"><button data-close>ปิด</button></div>`); return; }
   const q = v => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
   const lines = ["place_id,keep,note", ...[...rows].map(([id, r]) => [id, r.keep, String(r.note || "").replace(/\n/g, " ")].map(v => q(String(v))).join(","))];
   download("keep.csv", "﻿" + lines.join("\n"), "text/csv;charset=utf-8");
@@ -1164,9 +1147,9 @@ function setupExcluded() {
     const q = $("ex-q").value.trim().toLowerCase();
     const hits = ex.filter(r => !q || r.name.toLowerCase().includes(q)).slice(0, 80);
     $("exlist").innerHTML = hits.map(r => `<div class="exrow"><div>${esc(r.name)}</div>
-        <button data-ex="${esc(r.id)}">${S.restored[r.id] ? "↩ ยกเลิก" : "เอากลับมา"}</button>
-        <div class="msub">${esc(r.note || r.type)} · ${esc(r.amphoe)}${r.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener">Maps ↗</a>` : ""}</div></div>`).join("")
-      + (ex.length > hits.length ? `<p class="hint">แสดง ${hits.length} รายการ — พิมพ์ค้นหาเพื่อดูที่เหลือ</p>` : "");
+        <button data-ex="${esc(r.id)}">${S.restored[r.id] ? "↩ ยกเลิก" : "เอากลับ"}</button>
+        <div class="msub">${esc(whyExcluded(r.note) || r.type)} · ${esc(r.amphoe)}${r.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener">Maps ↗</a>` : ""}</div></div>`).join("")
+      + (ex.length > hits.length ? `<p class="hint">+ อีก ${fmt(ex.length - hits.length)} — พิมพ์ค้นหา</p>` : "");
     $("exlist").querySelectorAll("[data-ex]").forEach(b => b.onclick = () => {
       const id = b.dataset.ex;
       if (S.restored[id]) delete S.restored[id]; else S.restored[id] = true;
@@ -1195,7 +1178,7 @@ $("btn-side").onclick = () => $("side").classList.toggle("open");
 /* ---------- boot ---------- */
 function renderAll() { renderPresets(); renderPillars(); renderNotice(); update(); }
 $("sub").textContent = `${DATA.area ? DATA.area + " · " : ""}` +
-  (DATA.fetched ? `ข้อมูลรีวิว ณ ${DATA.fetched[0] === DATA.fetched[1] ? DATA.fetched[0] : DATA.fetched[0] + " – " + DATA.fetched[1]}` : `สร้างเมื่อ ${DATA.generated}`);
+  (DATA.fetched ? `ข้อมูล ณ ${DATA.fetched[0] === DATA.fetched[1] ? DATA.fetched[0] : DATA.fetched[0] + " – " + DATA.fetched[1]}` : `สร้างเมื่อ ${DATA.generated}`);
 setupFilters();
 setupMap();
 renderAll();

@@ -108,9 +108,9 @@ def test_payload_shape(features_df):
 
 def test_describe_feature_labels():
     assert describe_feature("conv_store_500") == {"label": "ร้านสะดวกซื้อ", "group": "shops", "unit": "แห่ง", "scale": 1, "radius": 500}
-    assert describe_feature("industrial_ha_1500")["label"] == "พื้นที่โรงงาน (OSM)"
+    assert describe_feature("industrial_ha_1500")["label"] == "พื้นที่โรงงาน"
     assert describe_feature("campus_3000")["label"].startswith("มหาวิทยาลัย")
-    assert "นับทุกตึก" in describe_feature("university_1500")["label"]  # says what Google actually counts
+    assert "Google" in describe_feature("university_1500")["label"]  # not the campus count
     assert describe_feature("lodging_1500")["group"] == "tourism"
     assert describe_feature("industrial_ha_1500")["unit"] == "ไร่"
     assert describe_feature("seven_ปั๊ม_500")["label"] == "7-Eleven · ปั๊ม"

@@ -27,22 +27,21 @@ GROUPS = [
 
 # feature base name -> (Thai label, group, unit, display multiplier)
 FEATURE_INFO = {
-    # labels say what is actually counted (QA: "ซูเปอร์มาร์เก็ต 133 แห่ง" were mostly grocery shops)
     "conv_store": ("ร้านสะดวกซื้อ", "shops", "แห่ง", 1),
-    "supermarket": ("ซูเปอร์ฯ / ร้านของชำ", "shops", "แห่ง", 1),
-    "mall": ("ห้าง / พลาซ่า / ตลาดอื่น (Google นับรวม)", "shops", "แห่ง", 1),
+    "supermarket": ("ซูเปอร์ / ร้านชำ", "shops", "แห่ง", 1),
+    "mall": ("ห้าง / พลาซ่า", "shops", "แห่ง", 1),
     "seven": ("7-Eleven", "shops", "สาขา", 1),
-    "campus": ("มหาวิทยาลัย / วิทยาลัย (นับวิทยาเขต)", "people", "แห่ง", 1),
-    "university": ("หมุด 'มหาวิทยาลัย' ของ Google (นับทุกตึก/คณะ)", "people", "หมุด", 1),
-    "school": ("โรงเรียน (OSM)", "people", "แห่ง", 1),
+    "campus": ("มหาวิทยาลัย", "people", "แห่ง", 1),
+    "university": ("หมุดมหาวิทยาลัย (Google)", "people", "หมุด", 1),  # every building/faculty pin
+    "school": ("โรงเรียน", "people", "แห่ง", 1),
     "apartment": ("หอพัก / อพาร์ตเมนต์", "people", "แห่ง", 1),
-    "lodging": ("โรงแรม / ที่พักนักท่องเที่ยว", "tourism", "แห่ง", 1),
-    "hospital": ("โรงพยาบาล (OSM)", "people", "แห่ง", 1),
-    "workplace": ("ออฟฟิศ / หน่วยราชการ", "work", "แห่ง", 1),
-    "industrial_ha": ("พื้นที่โรงงาน (OSM)", "work", "ไร่", 6.25),  # hectares → rai
+    "lodging": ("โรงแรม / ที่พัก", "tourism", "แห่ง", 1),
+    "hospital": ("โรงพยาบาล", "people", "แห่ง", 1),
+    "workplace": ("ออฟฟิศ / ราชการ", "work", "แห่ง", 1),
+    "industrial_ha": ("พื้นที่โรงงาน", "work", "ไร่", 6.25),  # hectares → rai
     "industrial": ("โรงงาน", "work", "แห่ง", 1),
     "estate_workers": ("คนงานนิคมฯ", "work", "คน", 1),
-    "transit": ("ป้ายรถเมล์ (OSM — ข้อมูลไม่ครบ)", "access", "จุด", 1),
+    "transit": ("ป้ายรถเมล์", "access", "จุด", 1),
 }
 
 # what to type into Google Maps to eyeball a Google count (the Aggregate API gives numbers, not places)
@@ -58,13 +57,13 @@ GOOGLE_SEARCH = {
 
 # non-radius features: key -> (label, group, unit, display multiplier)
 BASE_FEATURES = {
-    "reviews": ("จำนวนรีวิว", "popularity", "รีวิว", 1),
-    "rating": ("เรตติ้ง (ปรับตามจำนวนรีวิว)", "popularity", "/ 5", 1),
-    "dup_count": ("listing ซ้ำที่รวมเข้ามา", "other", "listing", 1),
-    "days_open": ("จำนวนวันที่เปิด", "hours", "วัน/สัปดาห์", 7),
-    "open_morning": ("เปิดช่วงเช้า (06–10 น.)", "hours", "วัน/สัปดาห์", 7),
-    "open_evening": ("เปิดช่วงเย็น (16–20 น.)", "hours", "วัน/สัปดาห์", 7),
-    "open_night": ("เปิดช่วงดึก (20–02 น.)", "hours", "วัน/สัปดาห์", 7),
+    "reviews": ("รีวิว", "popularity", "รีวิว", 1),
+    "rating": ("เรตติ้ง", "popularity", "/ 5", 1),
+    "dup_count": ("หมุดซ้ำที่รวม", "other", "หมุด", 1),
+    "days_open": ("วันที่เปิด", "hours", "วัน/สัปดาห์", 7),
+    "open_morning": ("เปิดเช้า 06–10", "hours", "วัน/สัปดาห์", 7),
+    "open_evening": ("เปิดเย็น 16–20", "hours", "วัน/สัปดาห์", 7),
+    "open_night": ("เปิดดึก 20–02", "hours", "วัน/สัปดาห์", 7),
 }
 
 KINDS = [
